@@ -15,7 +15,8 @@
 # - log: every change, with time and result
 # - stops at the first unexpected result (non-zero exit, unexpected state)
 # - check_one and apply_one run in subshells with `set -e`, so a failing
-#   command anywhere in a kind stops the run (not only the last one)
+#   command anywhere in a kind stops the run (not only the last one);
+#   "already done" is exit code 10, which no failing command gives by accident
 #
 # Usage: <script> [--apply]
 # Needs: gh (logged in, write access), jq.
@@ -33,12 +34,12 @@ touch "$STATE"
 log() { printf '%s %s\n' "$(date -Is)" "$*" | tee -a "$LOG"; }
 
 # check_one <owner/repo> <kind> <arg>: exit 0 if the action is still needed,
-# 1 if already done, 2 if the state is unexpected (stop)
+# 10 if already done, anything else if the state is unexpected (stop)
 check_one() {
   local repo=$1 kind=$2 arg=$3
   case $kind in
     # example: add-label) gh issue view "${arg%%:*}" --repo "$repo" --json labels \
-    #   | jq -e --arg l "${arg#*:}" 'any(.labels[]; .name == $l)' >/dev/null && return 1 || return 0 ;;
+    #   | jq -e --arg l "${arg#*:}" 'any(.labels[]; .name == $l)' >/dev/null && return 10 || return 0 ;;
     *) echo "unknown kind for $repo: $kind ($arg)" >&2; return 2 ;;
   esac
 }
@@ -59,7 +60,7 @@ while IFS=$'\t' read -r id repo kind arg || [[ -n ${id:-} ]]; do
   set +e; (set -e; check_one "$repo" "$kind" "$arg"); rc=$?; set -e
   case $rc in
     0) ;;
-    1) log "SKIP  $id $repo $kind $arg (already done)"; $APPLY && echo "$id" >>"$STATE"; continue ;;
+    10) log "SKIP  $id $repo $kind $arg (already done)"; $APPLY && echo "$id" >>"$STATE"; continue ;;
     *) log "STOP  $id $repo $kind $arg (unexpected state)"; exit 1 ;;
   esac
   if ! $APPLY; then log "DRY   $id $repo $kind $arg"; continue; fi

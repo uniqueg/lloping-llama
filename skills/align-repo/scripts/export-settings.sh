@@ -45,15 +45,17 @@ names() {
   fi
 }
 
-# probe <endpoint> <file>: 0 if it exists (body to <file>), 1 on HTTP 404,
-# 2 on any other error (counted)
+# probe <endpoint> <file>: 0 if it exists (body to <file>), 1 on HTTP 404 or
+# a feature not available on the plan, 2 on any other error (counted)
 probe() {
   local endpoint=$1 file=$2 err
   if gh api "$endpoint" >"$file" 2>"$OUT/.probe.err"; then
     return 0
   fi
   err=$(head -c 200 "$OUT/.probe.err")
-  if grep -q 'HTTP 404' <<<"$err"; then
+  # 404: off or none; 403 "Upgrade to GitHub Pro": the feature isn't
+  # available for this private repository, so there is nothing to export
+  if grep -q 'HTTP 404' <<<"$err" || grep -q 'Upgrade to GitHub Pro' <<<"$err"; then
     return 1
   fi
   echo "error  $endpoint: $err"
