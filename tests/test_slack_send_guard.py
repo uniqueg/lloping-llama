@@ -308,14 +308,17 @@ class TestDenied:
         ("people", "expected"),
         [
             # A person under a level-3 heading counts for nobody
-            ("## Team\n### Bob\n- slack: U2\n- send: auto\n### Carol\n- slack: U3\n", "not a"),
+            (
+                "## Team\n### Bob\n- slack: U2\n- send: auto\n### Carol\n- slack: U3\n",
+                "is not a person",
+            ),
             # A setext heading ends the previous person
-            ("## Bob\n- slack: U2\n- send: auto\n\nCarol\n-----\n- slack: U3\n", "not a"),
+            ("## Bob\n- slack: U2\n- send: auto\n\nCarol\n-----\n- slack: U3\n", "is not a person"),
             # A level-1 heading ends the previous person
-            ("## Bob\n- slack: U2\n- send: auto\n# Others\n- slack: U3\n", "not a"),
+            ("## Bob\n- slack: U2\n- send: auto\n# Others\n- slack: U3\n", "is not a person"),
             # Fenced examples don't count
-            ("## Bob\n- slack: U2\n- send: auto\n```\n- slack: U3\n```\n", "not a"),
-            ("## Bob\n- slack: U2\n- send: auto\n~~~md\n- slack: U3\n~~~\n", "not a"),
+            ("## Bob\n- slack: U2\n- send: auto\n```\n- slack: U3\n```\n", "is not a person"),
+            ("## Bob\n- slack: U2\n- send: auto\n~~~md\n- slack: U3\n~~~\n", "is not a person"),
             # Nested items are prose, not fields
             ("## Carol\n- slack: U3\n- notes: x\n  - send: auto\n", "not marked"),
             # A key given twice in one section is refused
@@ -345,6 +348,52 @@ class TestDenied:
         payload = event({"channel_id": "U2", "message": MESSAGE})
         assert expected in str(reason_of(payload, {"LLOPING_LLAMA_PEOPLE": str(path)}))
 
+    @pytest.mark.parametrize(
+        "people",
+        [
+            # A shorter fence inside a longer one doesn't close it
+            "## Bob\n- slack: U3\n````markdown\n```\n- send: auto\n```\n````\n",
+            "## Bob\n- slack: U3\n~~~~\n~~~\n- send: auto\n~~~\n~~~~\n",
+            # A closer indented by four spaces or followed by text doesn't close it
+            "## Bob\n- slack: U3\n```\n    ```\n- send: auto\n```\n",
+            "## Bob\n- slack: U3\n```\n``` not a closer\n- send: auto\n```\n",
+            # A comment that starts a line hides what it encloses
+            "## Bob\n- slack: U3\n<!--\n- send: auto\n-->\n",
+            "## Bob\n- slack: U3\n<!-- - send: auto -->\n",
+        ],
+    )
+    def test_hidden_fields(self, tmp_path: Path, people: str) -> None:
+        """Fields inside code blocks and comments never count."""
+        path = tmp_path / "people.md"
+        path.write_text(f"---\nowner: Alice\n---\n{people}", encoding="utf-8")
+        payload = event({"channel_id": "U3", "message": MESSAGE})
+        assert "is not marked" in str(reason_of(payload, {"LLOPING_LLAMA_PEOPLE": str(path)}))
+
+    @pytest.mark.parametrize(
+        ("people", "expected"),
+        [
+            ("## Bob\n- slack: U3\n- send: auto\n- notes: hide `<!--`\n", "middle of a line"),
+            ("## Bob\n- slack: U3\n- send: auto\n<!-- x --> y\n", "text after the end"),
+            ("## Bob\n- slack: U3\n- send: auto\n<!--\nx\n--> y\n", "text after the end"),
+            ("## Bob\n- slack: U3\n- send: auto\n- notes: end `-->`\n", "middle of a line"),
+        ],
+    )
+    def test_comment_markers(self, tmp_path: Path, people: str, expected: str) -> None:
+        """Comment markers a renderer could read differently block auto-sending."""
+        path = tmp_path / "people.md"
+        path.write_text(f"---\nowner: Alice\n---\n{people}", encoding="utf-8")
+        payload = event({"channel_id": "U3", "message": MESSAGE})
+        assert expected in str(reason_of(payload, {"LLOPING_LLAMA_PEOPLE": str(path)}))
+
+    def test_comment_in_front_matter(self, tmp_path: Path) -> None:
+        """A comment marker in the front matter blocks auto-sending."""
+        path = tmp_path / "people.md"
+        path.write_text(
+            "---\nowner: Alice <!-- x -->\n---\n## Bob\n- slack: U2\n- send: auto\n", "utf-8"
+        )
+        payload = event({"channel_id": "U2", "message": MESSAGE})
+        assert "front matter" in str(reason_of(payload, {"LLOPING_LLAMA_PEOPLE": str(path)}))
+
 
 class TestParsing:
     """The people file parser."""
@@ -356,20 +405,25 @@ class TestParsing:
             '## Bob\n- Slack: `U2`\n* send: "auto"\ntext\n'
         )
         assert people.settings == {"owner": "Alice"}
-        assert people.persons == [{"heading": "Bob", "slack": "U2", "send": "auto"}]
+        assert people.persons == [{guard.HEADING: "Bob", "slack": "U2", "send": "auto"}]
 
     def test_trailing_comments(self) -> None:
         """A trailing ``# comment`` is dropped; a ``#`` inside a value stays."""
-        people = guard.parse_people("## Bob\n- slack: U2  # guess\n- notes: see #12\n##\n")
+        people = guard.parse_people(
+            '---\nauto-note: "bot # 1"  # quoted\nowner: A # B\n---\n'
+            "## Bob\n- slack: U2  # guess\n- notes: see #12\n##\n"
+        )
+        assert people.settings == {"auto-note": "bot # 1", "owner": "A"}
         assert people.persons == [
-            {"heading": "Bob", "slack": "U2", "notes": "see #12"},
-            {"heading": ""},
+            {guard.HEADING: "Bob", "slack": "U2", "notes": "see #12"},
+            {guard.HEADING: ""},
         ]
 
     def test_template(self) -> None:
         """The shipped template parses: an owner, and persons with slack and send."""
         people = guard.parse_people(TEMPLATE.read_text(encoding="utf-8"))
         assert people.settings["owner"]
+        assert not people.unsafe
         assert people.persons
         assert all("slack" in person and "send" in person for person in people.persons)
 

@@ -69,10 +69,12 @@ notes      no        what an agent should know before writing to them
 ```
 
 \* Needed for Slack drafts. Keys are case-insensitive; values may be quoted or in backticks, and
-a trailing `# comment` is ignored. Only top-level list items directly under a person's level-2
-heading count: any other heading ends the person, and nested items, fenced code blocks and HTML
-comments are ignored. A key given twice in one section blocks auto-sending to that person, as
-does a repeated or empty setting in the front matter.
+a trailing `# comment` is ignored (quote a value that contains ` # `). Only top-level list items
+directly under a person's level-2 heading count: any other heading ends the person, and nested
+items, fenced code blocks and HTML comments that start a line are ignored. A key given twice in
+one section blocks auto-sending to that person, as does a repeated or empty setting in the front
+matter. An HTML comment marker (`<!--`, `-->`) anywhere else, e.g. inside a value or after the end
+of a comment, blocks auto-sending for the whole file.
 
 ### `send: auto`
 
@@ -115,8 +117,7 @@ It needs `python3` (3.10 or later, standard library only) and the location of yo
 Put this into `~/.claude/settings.json`, or set `LLOPING_LLAMA_PEOPLE` to the file itself. The
 hook allows a call only if the target is a person ID or DM channel, every section with that ID
 says `send: auto`, the call isn't a broadcast reply and the message ends with the note on a line
-of its own. Otherwise
-it denies the call and tells the agent to draft instead.
+of its own. Otherwise it denies the call and tells the agent to draft instead.
 
 The hook fails closed: without the variable, with a missing or unreadable people file, without an
 owner, on invalid input or an unexpected error, it blocks the send. If `python3` is missing, the

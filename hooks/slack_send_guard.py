@@ -44,15 +44,18 @@ PERSON_PREFIXES = ("U", "W", "D")
 
 #: Key under which a section records the keys it gives more than once.
 DUPLICATE = "!duplicate"
+#: Key under which a section keeps its heading (``!`` can't start a field key).
+HEADING = "!heading"
 
-_COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
 # Fields are top-level list items only; nested items are prose
 _ITEM = re.compile(r"^[-*]\s+([A-Za-z][\w-]*)\s*:\s*(.*?)\s*$")
 _PAIR = re.compile(r"^\s*([A-Za-z][\w-]*)\s*:\s*(.*?)\s*$")
 _HEADING = re.compile(r"^ {0,3}(#{1,6})(?:\s+(.*?))?\s*#*\s*$")
 _SETEXT = re.compile(r"^ {0,3}(=+|-+)\s*$")
-_FENCE = re.compile(r"^ {0,3}(`{3}|~{3})")
-_TRAILING_COMMENT = re.compile(r"\s+#(\s.*)?$")
+_FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+_CLOSING = re.compile(r"^ {0,3}(`+|~+)\s*$")
+_QUOTED = re.compile(r"^([\"'`])(.*)\1(?:\s+#(?:\s.*)?)?$")
+_TRAILING_COMMENT = re.compile(r"\s+#(?:\s.*)?$")
 
 
 @dataclass
@@ -61,11 +64,15 @@ class People:
 
     Attributes:
         settings: Front-matter keys (e.g. ``owner``, ``auto-note``), lower-cased.
-        persons: One dict of lower-cased keys and values per level-2 section.
+        persons: One dict of lower-cased keys and values per level-2 section; the heading is
+            under ``HEADING``.
+        unsafe: Why the file can't be trusted for auto-sending (e.g. an HTML comment marker in
+            the middle of a line), or empty.
     """
 
     settings: dict[str, str] = field(default_factory=dict)
     persons: list[dict[str, str]] = field(default_factory=list)
+    unsafe: str = ""
 
 
 class GuardError(Exception):
@@ -73,7 +80,9 @@ class GuardError(Exception):
 
 
 def _clean(value: str) -> str:
-    """Strip whitespace, matching quotes and inline-code backticks from a value.
+    """Strip whitespace, matching quotes or backticks and a trailing ``# comment`` from a value.
+
+    A quoted value keeps everything between its quotes, ``#`` included.
 
     Args:
         value: A raw value from the people file.
@@ -81,11 +90,28 @@ def _clean(value: str) -> str:
     Returns:
         The bare value.
     """
-    value = _TRAILING_COMMENT.sub("", value).strip()
-    for quote in ('"', "'", "`"):
-        if len(value) >= 2 and value[0] == quote and value[-1] == quote:
-            return value[1:-1].strip()
-    return value
+    value = value.strip()
+    quoted = _QUOTED.match(value)
+    if quoted:
+        return quoted.group(2).strip()
+    return _TRAILING_COMMENT.sub("", value).strip()
+
+
+def _closes(line: str, fence: str) -> bool:
+    """Tell whether a line closes a fenced code block (CommonMark rules).
+
+    Args:
+        line: The line.
+        fence: The opening fence run, e.g. three or more backticks.
+
+    Returns:
+        True if the line is a closing fence for it.
+    """
+    match = _CLOSING.match(line)
+    if match is None:
+        return False
+    run = match.group(1)
+    return run[0] == fence[0] and len(run) >= len(fence)
 
 
 def parse_people(text: str) -> People:
@@ -94,8 +120,10 @@ def parse_people(text: str) -> People:
     The file may start with front matter between two ``---`` lines, holding ``key: value``
     settings. Each level-2 heading starts a person; top-level ``- key: value`` list items below it
     are the person's fields. Any other heading ends the person, so fields under it count for
-    nobody. HTML comments, fenced code blocks, nested list items and trailing ``# comments`` are
-    ignored, so fill-in instructions and examples never count.
+    nobody. Fenced code blocks, nested list items, trailing ``# comments`` and HTML comments that
+    start a line are ignored, so fill-in instructions and examples never count. An HTML comment
+    marker anywhere else marks the whole file unsafe for auto-sending, because a renderer and this
+    parser could disagree about what it hides.
 
     Args:
         text: The content of the people file.
@@ -104,12 +132,14 @@ def parse_people(text: str) -> People:
         The settings and persons found.
     """
     people = People()
-    lines = _COMMENT.sub("", text).splitlines()
+    lines = text.splitlines()
     if lines and lines[0].strip() == "---":
         for index, line in enumerate(lines[1:], start=1):
             if line.strip() == "---":
                 lines = lines[index + 1 :]
                 break
+            if "<!--" in line or "-->" in line:
+                people.unsafe = "an HTML comment marker in the front matter"
             match = _PAIR.match(line)
             if match:
                 _store(people.settings, match.group(1), match.group(2))
@@ -118,17 +148,32 @@ def parse_people(text: str) -> People:
             lines = []
     person: dict[str, str] | None = None
     fence: str | None = None
+    comment = False
     previous = ""
     for line in lines:
         if fence is not None:
-            if line.lstrip().startswith(fence):
+            if _closes(line, fence):
                 fence = None
+        elif comment:
+            if "-->" in line:
+                comment = False
+                if line.split("-->", 1)[1].strip():
+                    people.unsafe = "text after the end of an HTML comment"
+        elif line.lstrip().startswith("<!--"):
+            rest = line.lstrip()[4:]
+            if "-->" in rest:
+                if rest.split("-->", 1)[1].strip():
+                    people.unsafe = "text after the end of an HTML comment"
+            else:
+                comment = True
+        elif "<!--" in line or "-->" in line:
+            people.unsafe = "an HTML comment marker in the middle of a line"
         elif opening := _FENCE.match(line):
             fence = opening.group(1)
         elif heading := _HEADING.match(line):
             # Only level-2 headings start a person; any other heading ends one
             if len(heading.group(1)) == 2:
-                person = {"heading": heading.group(2) or ""}
+                person = {HEADING: heading.group(2) or ""}
                 people.persons.append(person)
             else:
                 person = None
@@ -164,9 +209,11 @@ def auto_note(people: People) -> str:
         The note with ``{owner}`` replaced by the owner's name.
 
     Raises:
-        GuardError: If the front matter names no owner, gives a key twice or sets an empty
-            note.
+        GuardError: If the file is unsafe, or its front matter names no owner, gives a key
+            twice or sets an empty note.
     """
+    if people.unsafe:
+        raise GuardError(f"the people file has {people.unsafe}")
     if DUPLICATE in people.settings:
         raise GuardError(f"the people file's front matter repeats {people.settings[DUPLICATE]}")
     owner = people.settings.get("owner", "")
@@ -211,9 +258,9 @@ def check(tool_input: dict[str, Any], people: People) -> None:
         raise GuardError(f"{target} is not a person in the people file")
     for person in matches:
         if DUPLICATE in person:
-            raise GuardError(f"{person['heading']} gives {person[DUPLICATE]} more than once")
+            raise GuardError(f"{person[HEADING]} gives {person[DUPLICATE]} more than once")
         if person.get("send", "draft").lower() != "auto":
-            raise GuardError(f"{person['heading']} is not marked `send: auto`")
+            raise GuardError(f"{person[HEADING]} is not marked `send: auto`")
     note = auto_note(people)
     message = tool_input.get("message")
     body = message.rstrip() if isinstance(message, str) else ""
