@@ -68,7 +68,11 @@ send       yes       draft (default) or auto
 notes      no        what an agent should know before writing to them
 ```
 
-\* Needed for Slack drafts. Keys are case-insensitive; values may be quoted or in backticks.
+\* Needed for Slack drafts. Keys are case-insensitive; values may be quoted or in backticks, and
+a trailing `# comment` is ignored. Only top-level list items directly under a person's level-2
+heading count: any other heading ends the person, and nested items, fenced code blocks and HTML
+comments are ignored. A key given twice in one section blocks auto-sending to that person, as
+does a repeated or empty setting in the front matter.
 
 ### `send: auto`
 
@@ -76,8 +80,8 @@ notes      no        what an agent should know before writing to them
   other target are always drafts, whatever the file says; the hook blocks them.
 - A missing or unknown value means `draft`. A person listed twice is `auto` only if every entry
   says so.
-- Every auto-sent message ends with the auto-send note, unchanged, also in messages in another
-  language.
+- Every auto-sent message ends with the auto-send note, unchanged and on a line of its own after
+  the text, also in messages in another language.
 - Thread replies that are also broadcast to the channel are never auto-sent.
 - Scheduled messages (`slack_schedule_message`) follow the same rules as sends.
 
@@ -95,7 +99,9 @@ message shows up in the conversation and delete it if you discard the draft.
 ## The Slack send guard hook
 
 `hooks/slack_send_guard.py` runs before every Slack tool call whose name ends in
-`slack_send_message` or `slack_schedule_message` (any Slack MCP server; drafts are never blocked).
+`slack_send_message` or `slack_schedule_message`, from any MCP server; drafts are never blocked.
+Slack servers whose send tools have other names (e.g. `slack_post_message`) are **not**
+guarded; don't enable them next to this plugin.
 It needs `python3` (3.10 or later, standard library only) and the location of your people file:
 
 ```json
@@ -108,7 +114,8 @@ It needs `python3` (3.10 or later, standard library only) and the location of yo
 
 Put this into `~/.claude/settings.json`, or set `LLOPING_LLAMA_PEOPLE` to the file itself. The
 hook allows a call only if the target is a person ID or DM channel, every section with that ID
-says `send: auto`, the call isn't a broadcast reply and the message ends with the note. Otherwise
+says `send: auto`, the call isn't a broadcast reply and the message ends with the note on a line
+of its own. Otherwise
 it denies the call and tells the agent to draft instead.
 
 The hook fails closed: without the variable, with a missing or unreadable people file, without an

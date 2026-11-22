@@ -45,7 +45,9 @@ Rules for `send: auto`:
     chats: those are always drafts, whatever this file says, and the hook blocks them.
   - Every automatically sent message ends with the auto-send note.
   - A missing or unknown `send` value means `draft`; a person listed twice is `auto` only if
-    every entry says so.
+    every entry says so; a key given twice in one section blocks auto-sending.
+  - Keep each person's fields directly under their level-2 heading: any other heading ends
+    the person.
 -->
 
 ## Alice Example

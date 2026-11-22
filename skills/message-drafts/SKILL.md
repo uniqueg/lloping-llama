@@ -1,6 +1,6 @@
 ---
 name: message-drafts
-description: Turn any message for a person or channel into an unsent Slack draft (slack_send_message_draft) instead of printing it for copy and paste. Reads the people file of your overlay for Slack IDs, language and notes; sends directly only to single persons marked `send auto`, never to channels or groups, and ends every auto-sent message with the auto-send note. Use whenever you would otherwise show the user a message to send (pings, questions, review requests, replies, status updates), or when asked to "draft a message to X", "ask X on Slack" or "tell X that ...".
+description: Turn any message for a person or channel into an unsent Slack draft (slack_send_message_draft) instead of printing it for copy and paste. Reads the people file of your overlay for Slack IDs, language and notes; sends directly only to single persons marked `send: auto`, never to channels or groups, and ends every auto-sent message with the auto-send note. Use whenever you would otherwise show the user a message to send (pings, questions, review requests, replies, status updates), or when asked to "draft a message to X", "ask X on Slack" or "tell X that ...".
 argument-hint: <person or channel> <what the message is about>
 ---
 
