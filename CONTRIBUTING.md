@@ -23,6 +23,7 @@ hooks/hooks.json          event hooks; scripts next to it, via ${CLAUDE_PLUGIN_R
 workflows/<name>.js       Workflow tool scripts
 bin/<name>                executables, on the Bash tool's PATH while the plugin is enabled
 templates/                files users copy (not loaded by the plugin)
+tests/                    smoke tests and the shell lint script (not loaded by the plugin)
 ```
 
 Only plugin components go into `agents/` and `bin/`: every Markdown file in `agents/` is loaded as
@@ -31,21 +32,28 @@ components in `docs/reference.md` instead.
 
 ## Checks
 
-CI (`.github/workflows/ci.yml`) runs these; run them locally before you push:
+CI (`.github/workflows/ci.yml`) runs these; run them locally before you push. The tool versions CI
+uses are pinned in the `env` block of `ci.yml`; use the same ones locally:
 
 ```sh
 # Markdown
-npx --yes markdownlint-cli2@0.24.0
-# Shell scripts
-shellcheck bin/claude-statusline skills/*/scripts/*.sh templates/overlay/me/collect-machine/*.sh
+npx --yes markdownlint-cli2@<MARKDOWNLINT_CLI2_VERSION>
+# Shell scripts: every tracked file with a sh, bash or zsh shebang
+bash tests/lint-shell.sh
+# Smoke tests of the shell scripts (status line, align-repo scripts, Linux collector)
+bash tests/smoke.sh
 # Plugin and marketplace manifests
-claude plugin validate --strict .
-claude plugin validate --strict .claude-plugin/marketplace.json
+npx --yes @anthropic-ai/claude-code@<CLAUDE_CODE_VERSION> plugin validate --strict .
+npx --yes @anthropic-ai/claude-code@<CLAUDE_CODE_VERSION> plugin validate --strict .claude-plugin/marketplace.json
 # Docs
 python3 -m venv .venv && .venv/bin/pip install '.[docs]' && .venv/bin/mkdocs build --strict
 ```
 
-PowerShell scripts are checked with PSScriptAnalyzer in CI.
+PowerShell scripts are checked with PSScriptAnalyzer in CI, and the machine-file collectors run on
+Linux, macOS and Windows runners (job `smoke`).
+
+The collectors in `templates/overlay/me/collect-machine/` share their helpers and tool list by
+copy, because each must run on its own (a user copies one file): change all three together.
 
 ## Reviews
 

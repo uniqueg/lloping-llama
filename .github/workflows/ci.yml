@@ -41,14 +41,8 @@ jobs:
       - name: Lint Markdown
         run: npx --yes "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}"
       - name: Lint shell scripts
-        # shellcheck is preinstalled on GitHub's Ubuntu runners; every script
-        # with a shell shebang is checked, wherever it lives
-        run: |
-          mapfile -t scripts < <(git ls-files | while read -r f; do
-            head -n 1 "$f" | grep -qE '^#!.*\b(ba|z)?sh\b' && echo "$f"
-          done)
-          printf 'checking %s\n' "${scripts[@]}"
-          shellcheck "${scripts[@]}"
+        # shellcheck is preinstalled on GitHub's Ubuntu runners
+        run: bash tests/lint-shell.sh
       - name: Lint PowerShell scripts
         shell: pwsh
         run: |
@@ -123,38 +117,61 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      - name: Run the smoke tests of the shell scripts
+        if: matrix.os == 'Linux'
+        run: bash tests/smoke.sh
+      # The collectors run with an editor path that holds the home path and
+      # the user name, so that the identity check below tests the scrubbing
       - name: Run the machine-file collector (Linux)
         if: matrix.os == 'Linux'
-        run: bash templates/overlay/me/collect-machine/linux.sh > "$RUNNER_TEMP/machine.md"
+        run: |
+          c=templates/overlay/me/collect-machine/linux.sh
+          EDITOR="$HOME/bin/$(id -un)-editor" bash "$c" >"$RUNNER_TEMP/machine.md" 2>"$RUNNER_TEMP/err"
+          bash "$c" --with-identity >"$RUNNER_TEMP/identity.md"
       - name: Run the machine-file collector (macOS, zsh and sh)
         if: matrix.os == 'macOS'
         run: |
-          zsh templates/overlay/me/collect-machine/macos.sh > "$RUNNER_TEMP/machine.md"
-          sh templates/overlay/me/collect-machine/macos.sh > "$RUNNER_TEMP/machine-sh.md"
-          diff <(grep -v '^- Shell' "$RUNNER_TEMP/machine.md") <(grep -v '^- Shell' "$RUNNER_TEMP/machine-sh.md")
+          c=templates/overlay/me/collect-machine/macos.sh
+          EDITOR="$HOME/bin/$(id -un)-editor" zsh "$c" >"$RUNNER_TEMP/machine.md" 2>"$RUNNER_TEMP/err"
+          EDITOR="$HOME/bin/$(id -un)-editor" sh "$c" >"$RUNNER_TEMP/machine-sh.md" 2>>"$RUNNER_TEMP/err"
+          diff "$RUNNER_TEMP/machine.md" "$RUNNER_TEMP/machine-sh.md"
+          zsh "$c" --with-identity >"$RUNNER_TEMP/identity.md"
       - name: Run the machine-file collector (Windows)
         if: matrix.os == 'Windows'
         shell: pwsh
         run: |
-          & templates/overlay/me/collect-machine/windows.ps1 | Out-File -Encoding utf8 "$env:RUNNER_TEMP/machine.md"
+          $c = 'templates/overlay/me/collect-machine/windows.ps1'
+          $env:EDITOR = "$env:USERPROFILE\bin\$env:USERNAME-editor"
+          & $c 2>"$env:RUNNER_TEMP/err" | Out-File -Encoding utf8 "$env:RUNNER_TEMP/machine.md"
+          if (-not $?) { exit 1 }
+          $env:EDITOR = $null
+          & $c -WithIdentity | Out-File -Encoding utf8 "$env:RUNNER_TEMP/identity.md"
           if (-not $?) { exit 1 }
       - name: Check the output
-        # A machine file with an OS line, a tools section and no identity
-        # (user name, home path, host name) of the runner
+        # A machine file with an OS line, at least one real tool version, no
+        # error output and no identity (user name, home path, host name) of
+        # the runner; with identity on request
         shell: bash
         run: |
           f="$RUNNER_TEMP/machine.md"
           cat "$f"
           grep -q '^- OS: ' "$f"
-          grep -q '^## Tools' "$f"
+          grep -qE '^git +git version [0-9]' "$f"
+          grep -q '^- Editor (VISUAL/EDITOR): ~' "$f"
+          if [[ -s $RUNNER_TEMP/err ]]; then
+            echo "::error::the collector wrote to stderr"
+            cat "$RUNNER_TEMP/err"
+            exit 1
+          fi
           user=$(id -un 2>/dev/null || echo "${USERNAME:-}")
-          host=$(hostname)
-          for s in "$user" "$HOME" "$host"; do
-            if [[ -n $s ]] && grep -qiF "$s" "$f"; then
+          [[ -n ${USERNAME:-} ]] && user=$USERNAME
+          for s in "$user" "$HOME" "${USERPROFILE:-}" "$(hostname)"; do
+            if [[ -n $s ]] && grep -qiF -- "$s" "$f"; then
               echo "::error::the machine file contains identity: $s"
               exit 1
             fi
           done
+          grep -qiF -- "- User: $user" "$RUNNER_TEMP/identity.md"
 
   # The gate: the only required check of this workflow, a stable name
   # independent of the jobs and their matrices. Runs always and needs every
