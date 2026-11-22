@@ -48,6 +48,21 @@ Files in `bin/` are on the Bash tool's PATH while the plugin is enabled. Plugins
 status line; see [Getting started](getting-started.md#add-the-status-line). The activity time uses
 GNU `find -printf` and is left out where that is missing (e.g. macOS).
 
+## Output styles
+
+```text
+Style  Selected as            Does
+-----  ---------------------  ---------------------------------------------------------
+Terse  lloping-llama:Terse    short terminal replies; full context only for decisions,
+                              which go to the to-do board; to-dos as prerequisites and
+                              exact steps; one line for background events; tables as
+                              fixed-width text in code blocks
+```
+
+The style keeps Claude Code's coding instructions (`keep-coding-instructions: true`) and only
+changes how Claude writes to you. It isn't applied automatically; select it as described in
+[Getting started](getting-started.md#select-the-output-style).
+
 ## Hooks and workflows
 
 None yet. See `hooks/README.md` and `workflows/README.md`.

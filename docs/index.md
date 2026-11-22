@@ -8,6 +8,8 @@ and project work. It ships:
   spec style, ecosystem conventions, docs coverage, PR-body claims).
 - **Skills** for recurring jobs, starting with `align-repo`, which audits a repository against its
   organization's policy and writes one instruction set.
+- **An output style**, `Terse`: short terminal replies, full context only for decisions, minimal
+  to-dos, fixed-width tables.
 - **A status line** that shows the model, the directory, activity and your usage limits.
 - **An overlay template**: the structure of a private repository for everything that is yours
   (preferences, machine, people, organizations, projects, to-dos), so the kit itself stays
