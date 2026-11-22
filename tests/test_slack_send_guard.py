@@ -21,6 +21,7 @@ NOTE = (
     "(Sent automatically by Claude on behalf of Alice, without their review; "
     "please treat with care.)"
 )
+MESSAGE = f"Hi Bob\n\n{NOTE}"
 PEOPLE = """---
 owner: Alice
 ---
@@ -139,17 +140,17 @@ class TestAllowed:
     def test_scheduled_message(self, environ: dict[str, str]) -> None:
         """Scheduled messages follow the same rules."""
         payload = event(
-            {"channel_id": "U0000000002", "message": f"Hi {NOTE}", "post_at": 1},
+            {"channel_id": "U0000000002", "message": MESSAGE, "post_at": 1},
             tool="mcp__claude_ai_Slack__slack_schedule_message",
         )
         assert reason_of(payload, environ) is None
 
     def test_thread_reply_in_dm(self, environ: dict[str, str]) -> None:
         """A thread reply in an auto person's DM passes."""
-        payload = event({"channel_id": "D0000000002", "message": NOTE, "thread_ts": "1.2"})
+        payload = event({"channel_id": "D0000000002", "message": MESSAGE, "thread_ts": "1.2"})
         assert reason_of(payload, environ) is None
 
-    @pytest.mark.parametrize("tool", ["mcp__slack__slack_send_message_draft", "Bash", None, 3])
+    @pytest.mark.parametrize("tool", ["mcp__slack__slack_send_message_draft", "Bash"])
     def test_other_tools(self, environ: dict[str, str], tool: object) -> None:
         """Drafts and other tools are never blocked, even to channels."""
         payload = event({"channel_id": "C1", "message": "x"}, tool=tool)
@@ -173,7 +174,7 @@ class TestAllowed:
         """Without LLOPING_LLAMA_PEOPLE, the file is read from the overlay root."""
         (tmp_path / "me").mkdir()
         (tmp_path / "me" / "people.md").write_text(PEOPLE, encoding="utf-8")
-        payload = event({"channel_id": "U0000000002", "message": NOTE})
+        payload = event({"channel_id": "U0000000002", "message": MESSAGE})
         assert reason_of(payload, {"LLOPING_LLAMA_OVERLAY": str(tmp_path)}) is None
 
 
@@ -222,11 +223,13 @@ class TestDenied:
         payload = event({"channel_id": target, "message": NOTE})
         assert expected in str(reason_of(payload, environ))
 
-    @pytest.mark.parametrize("message", ["Hi Bob", f"{NOTE} Hi Bob", None, 42])
+    @pytest.mark.parametrize(
+        "message", ["Hi Bob", f"{NOTE} Hi Bob", f"Hi Bob {NOTE}", NOTE, f"\n {NOTE}", None, 42]
+    )
     def test_missing_note(self, environ: dict[str, str], message: object) -> None:
         """An auto-sent message must end with the note."""
         payload = event({"channel_id": "U0000000002", "message": message})
-        assert f"must end with this note: {NOTE}" in str(reason_of(payload, environ))
+        assert f"on a line of its own after the text: {NOTE}" in str(reason_of(payload, environ))
 
     def test_no_owner(self, tmp_path: Path) -> None:
         """Without an owner, the note can't be built, so nothing is auto-sent."""
@@ -295,6 +298,53 @@ class TestDenied:
         assert (status, out) == (2, "")
         assert "RuntimeError('boom')" in err
 
+    @pytest.mark.parametrize("tool", [None, 3])
+    def test_no_tool_name(self, environ: dict[str, str], tool: object) -> None:
+        """Hook input without a tool name is refused."""
+        payload = event({"channel_id": "U0000000002", "message": MESSAGE}, tool=tool)
+        assert "names no tool" in str(reason_of(payload, environ))
+
+    @pytest.mark.parametrize(
+        ("people", "expected"),
+        [
+            # A person under a level-3 heading counts for nobody
+            ("## Team\n### Bob\n- slack: U2\n- send: auto\n### Carol\n- slack: U3\n", "not a"),
+            # A setext heading ends the previous person
+            ("## Bob\n- slack: U2\n- send: auto\n\nCarol\n-----\n- slack: U3\n", "not a"),
+            # A level-1 heading ends the previous person
+            ("## Bob\n- slack: U2\n- send: auto\n# Others\n- slack: U3\n", "not a"),
+            # Fenced examples don't count
+            ("## Bob\n- slack: U2\n- send: auto\n```\n- slack: U3\n```\n", "not a"),
+            ("## Bob\n- slack: U2\n- send: auto\n~~~md\n- slack: U3\n~~~\n", "not a"),
+            # Nested items are prose, not fields
+            ("## Carol\n- slack: U3\n- notes: x\n  - send: auto\n", "not marked"),
+            # A key given twice in one section is refused
+            ("## Carol\n- slack: U3\n- send: draft\n- send: auto\n", "gives send more"),
+            ("## Carol\n- slack: U0\n- slack: U3\n- send: auto\n", "gives slack more"),
+        ],
+    )
+    def test_layouts(self, tmp_path: Path, people: str, expected: str) -> None:
+        """Layouts that could merge one person's fields into another's are safe."""
+        path = tmp_path / "people.md"
+        path.write_text(f"---\nowner: Alice\n---\n{people}", encoding="utf-8")
+        payload = event({"channel_id": "U3", "message": MESSAGE})
+        assert expected in str(reason_of(payload, {"LLOPING_LLAMA_PEOPLE": str(path)}))
+
+    @pytest.mark.parametrize(
+        ("front", "expected"),
+        [
+            ("owner: Alice\nauto-note:", "empty auto-note"),
+            ('owner: Alice\nauto-note: ""', "empty auto-note"),
+            ("owner: Alice\nowner: Mallory", "repeats owner"),
+        ],
+    )
+    def test_bad_front_matter(self, tmp_path: Path, front: str, expected: str) -> None:
+        """An empty note or a repeated setting blocks auto-sending."""
+        path = tmp_path / "people.md"
+        path.write_text(f"---\n{front}\n---\n## Bob\n- slack: U2\n- send: auto\n", "utf-8")
+        payload = event({"channel_id": "U2", "message": MESSAGE})
+        assert expected in str(reason_of(payload, {"LLOPING_LLAMA_PEOPLE": str(path)}))
+
 
 class TestParsing:
     """The people file parser."""
@@ -307,6 +357,14 @@ class TestParsing:
         )
         assert people.settings == {"owner": "Alice"}
         assert people.persons == [{"heading": "Bob", "slack": "U2", "send": "auto"}]
+
+    def test_trailing_comments(self) -> None:
+        """A trailing ``# comment`` is dropped; a ``#`` inside a value stays."""
+        people = guard.parse_people("## Bob\n- slack: U2  # guess\n- notes: see #12\n##\n")
+        assert people.persons == [
+            {"heading": "Bob", "slack": "U2", "notes": "see #12"},
+            {"heading": ""},
+        ]
 
     def test_template(self) -> None:
         """The shipped template parses: an owner, and persons with slack and send."""
@@ -340,4 +398,6 @@ def test_hooks_json() -> None:
     assert matcher.search("mcp__claude_ai_Slack__slack_send_message")
     assert matcher.search("mcp__slack__slack_schedule_message")
     assert not matcher.search("mcp__claude_ai_Slack__slack_send_message_draft")
+    for tool in guard.GUARDED_TOOLS:
+        assert matcher.search(f"mcp__any__{tool}")
     assert "slack_send_guard.py" in entry["hooks"][0]["command"]

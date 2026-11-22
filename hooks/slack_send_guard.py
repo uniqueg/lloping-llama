@@ -42,10 +42,17 @@ DEFAULT_NOTE = (
 #: Slack ID prefixes of single persons: members (U, W) and direct messages (D).
 PERSON_PREFIXES = ("U", "W", "D")
 
+#: Key under which a section records the keys it gives more than once.
+DUPLICATE = "!duplicate"
+
 _COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
-_ITEM = re.compile(r"^\s*[-*]\s+([A-Za-z][\w-]*)\s*:\s*(.*?)\s*$")
+# Fields are top-level list items only; nested items are prose
+_ITEM = re.compile(r"^[-*]\s+([A-Za-z][\w-]*)\s*:\s*(.*?)\s*$")
 _PAIR = re.compile(r"^\s*([A-Za-z][\w-]*)\s*:\s*(.*?)\s*$")
-_HEADING = re.compile(r"^##\s+(.+?)\s*$")
+_HEADING = re.compile(r"^ {0,3}(#{1,6})(?:\s+(.*?))?\s*#*\s*$")
+_SETEXT = re.compile(r"^ {0,3}(=+|-+)\s*$")
+_FENCE = re.compile(r"^ {0,3}(`{3}|~{3})")
+_TRAILING_COMMENT = re.compile(r"\s+#(\s.*)?$")
 
 
 @dataclass
@@ -74,7 +81,7 @@ def _clean(value: str) -> str:
     Returns:
         The bare value.
     """
-    value = value.strip()
+    value = _TRAILING_COMMENT.sub("", value).strip()
     for quote in ('"', "'", "`"):
         if len(value) >= 2 and value[0] == quote and value[-1] == quote:
             return value[1:-1].strip()
@@ -85,8 +92,10 @@ def parse_people(text: str) -> People:
     """Parse a people file.
 
     The file may start with front matter between two ``---`` lines, holding ``key: value``
-    settings. Each level-2 heading starts a person; ``- key: value`` list items below it are the
-    person's fields. HTML comments are ignored, so fill-in instructions never count.
+    settings. Each level-2 heading starts a person; top-level ``- key: value`` list items below it
+    are the person's fields. Any other heading ends the person, so fields under it count for
+    nobody. HTML comments, fenced code blocks, nested list items and trailing ``# comments`` are
+    ignored, so fill-in instructions and examples never count.
 
     Args:
         text: The content of the people file.
@@ -103,21 +112,46 @@ def parse_people(text: str) -> People:
                 break
             match = _PAIR.match(line)
             if match:
-                people.settings[match.group(1).lower()] = _clean(match.group(2))
+                _store(people.settings, match.group(1), match.group(2))
         else:
             # Unterminated front matter: treat the whole file as settings only
             lines = []
     person: dict[str, str] | None = None
+    fence: str | None = None
+    previous = ""
     for line in lines:
-        heading = _HEADING.match(line)
-        if heading:
-            person = {"heading": heading.group(1)}
-            people.persons.append(person)
-            continue
-        item = _ITEM.match(line)
-        if item and person is not None:
-            person[item.group(1).lower()] = _clean(item.group(2))
+        if fence is not None:
+            if line.lstrip().startswith(fence):
+                fence = None
+        elif opening := _FENCE.match(line):
+            fence = opening.group(1)
+        elif heading := _HEADING.match(line):
+            # Only level-2 headings start a person; any other heading ends one
+            if len(heading.group(1)) == 2:
+                person = {"heading": heading.group(2) or ""}
+                people.persons.append(person)
+            else:
+                person = None
+        elif _SETEXT.match(line) and previous.strip():
+            person = None
+        elif (item := _ITEM.match(line)) and person is not None:
+            _store(person, item.group(1), item.group(2))
+        previous = line
     return people
+
+
+def _store(fields: dict[str, str], key: str, raw: str) -> None:
+    """Store one field; a key given twice is recorded as a duplicate.
+
+    Args:
+        fields: The settings or a person's fields.
+        key: The key as written.
+        raw: The raw value.
+    """
+    key = key.lower()
+    if key in fields:
+        fields[DUPLICATE] = ",".join(filter(None, (fields.get(DUPLICATE), key)))
+    fields[key] = _clean(raw)
 
 
 def auto_note(people: People) -> str:
@@ -130,15 +164,21 @@ def auto_note(people: People) -> str:
         The note with ``{owner}`` replaced by the owner's name.
 
     Raises:
-        GuardError: If the front matter names no owner.
+        GuardError: If the front matter names no owner, gives a key twice or sets an empty
+            note.
     """
+    if DUPLICATE in people.settings:
+        raise GuardError(f"the people file's front matter repeats {people.settings[DUPLICATE]}")
     owner = people.settings.get("owner", "")
     if not owner:
         raise GuardError(
             "the people file names no owner (front matter `owner: <your name>`), so the "
             "auto-send note can't be checked"
         )
-    return people.settings.get("auto-note", DEFAULT_NOTE).replace("{owner}", owner)
+    note = people.settings.get("auto-note", DEFAULT_NOTE).replace("{owner}", owner).strip()
+    if not note:
+        raise GuardError("the people file sets an empty auto-note")
+    return note
 
 
 def check(tool_input: dict[str, Any], people: People) -> None:
@@ -170,12 +210,19 @@ def check(tool_input: dict[str, Any], people: People) -> None:
     if not matches:
         raise GuardError(f"{target} is not a person in the people file")
     for person in matches:
+        if DUPLICATE in person:
+            raise GuardError(f"{person['heading']} gives {person[DUPLICATE]} more than once")
         if person.get("send", "draft").lower() != "auto":
             raise GuardError(f"{person['heading']} is not marked `send: auto`")
     note = auto_note(people)
     message = tool_input.get("message")
-    if not isinstance(message, str) or not message.rstrip().endswith(note):
-        raise GuardError(f"an auto-sent message must end with this note: {note}")
+    body = message.rstrip() if isinstance(message, str) else ""
+    text = body[: -len(note)].rstrip(" \t")
+    if not body.endswith(note) or not text.endswith("\n") or not text.strip():
+        raise GuardError(
+            f"an auto-sent message must end with this note, on a line of its own after the "
+            f"text: {note}"
+        )
 
 
 def people_path(environ: dict[str, str]) -> Path:
@@ -210,7 +257,9 @@ def evaluate(event: object, environ: dict[str, str]) -> str | None:
     if not isinstance(event, dict):
         return "the hook input is not a JSON object"
     tool = event.get("tool_name")
-    if not isinstance(tool, str) or not tool.endswith(GUARDED_TOOLS):
+    if not isinstance(tool, str):
+        return "the hook input names no tool"
+    if not tool.endswith(GUARDED_TOOLS):
         return None
     tool_input = event.get("tool_input")
     if not isinstance(tool_input, dict):
