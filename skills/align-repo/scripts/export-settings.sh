@@ -30,6 +30,37 @@ get() {
   fi
 }
 
+# names <file> <endpoint> <jq filter>: all pages of a list endpoint, one name
+# per item, as a JSON array (the filter runs per page and prints one name per
+# line, e.g. '.secrets[].name')
+names() {
+  local file=$1 endpoint=$2 filter=$3
+  if gh api --paginate "$endpoint" --jq "$filter" 2>"${OUT:?}/${file:?}.err" \
+    | jq -R . | jq -s . >"${OUT:?}/${file:?}"; then
+    rm -f "${OUT:?}/${file:?}.err"
+    echo "ok     $file"
+  else
+    echo "error  $file: $(head -c 200 "${OUT:?}/${file:?}.err")"
+    ERRORS=$((ERRORS + 1))
+  fi
+}
+
+# probe <endpoint> <file>: 0 if it exists (body to <file>), 1 on HTTP 404,
+# 2 on any other error (counted)
+probe() {
+  local endpoint=$1 file=$2 err
+  if gh api "$endpoint" >"$file" 2>"$OUT/.probe.err"; then
+    return 0
+  fi
+  err=$(head -c 200 "$OUT/.probe.err")
+  if grep -q 'HTTP 404' <<<"$err"; then
+    return 1
+  fi
+  echo "error  $endpoint: $err"
+  ERRORS=$((ERRORS + 1))
+  return 2
+}
+
 get general.json "repos/$R" '{default_branch, description, homepage, topics,
   visibility, archived, has_issues, has_projects, has_wiki, has_discussions,
   allow_squash_merge, allow_merge_commit, allow_rebase_merge,
@@ -40,19 +71,18 @@ get security.json "repos/$R" '.security_and_analysis'
 get private-vulnerability-reporting.json "repos/$R/private-vulnerability-reporting"
 get automated-security-fixes.json "repos/$R/automated-security-fixes"
 get code-scanning-default-setup.json "repos/$R/code-scanning/default-setup"
-# 204 = Dependabot alerts on, 404 = off
-if gh api "repos/$R/vulnerability-alerts" --silent 2>/dev/null; then
-  echo '{"dependabot_alerts": true}' >"$OUT/dependabot-alerts.json"
-else
-  echo '{"dependabot_alerts": false}' >"$OUT/dependabot-alerts.json"
-fi
-echo "ok     dependabot-alerts.json"
+# 204 = Dependabot alerts on, 404 = off, anything else = unknown (error)
+probe "repos/$R/vulnerability-alerts" /dev/null
+case $? in
+  0) echo '{"dependabot_alerts": true}' >"$OUT/dependabot-alerts.json"; echo "ok     dependabot-alerts.json" ;;
+  1) echo '{"dependabot_alerts": false}' >"$OUT/dependabot-alerts.json"; echo "ok     dependabot-alerts.json" ;;
+esac
 get actions-permissions.json "repos/$R/actions/permissions"
 get actions-workflow-permissions.json "repos/$R/actions/permissions/workflow"
 get community.json "repos/$R/community/profile" '{health_percentage, files: (.files | map_values(. != null))}'
 
 # Rulesets in the import format (Settings > Rules > Rulesets > Import)
-if ids=$(gh api "repos/$R/rulesets?includes_parents=false" --jq '.[].id' 2>"$OUT/rulesets.err"); then
+if ids=$(gh api --paginate "repos/$R/rulesets?includes_parents=false" --jq '.[].id' 2>"$OUT/rulesets.err"); then
   rm -f "${OUT:?}/rulesets.err"
   for id in $ids; do
     name=$(gh api "repos/$R/rulesets/$id" --jq '.name' | tr ' :/' '-__')
@@ -66,36 +96,37 @@ fi
 # Classic branch protection (should not exist when rulesets are used; 404 = none)
 default=$(jq -r .default_branch "$OUT/general.json" 2>/dev/null || echo main)
 for b in $(printf '%s\n' "$default" main dev | sort -u); do
-  if gh api "repos/$R/branches/$b/protection" >"$OUT/classic-protection-$b.json" 2>/dev/null; then
-    echo "found  classic-protection-$b.json (classic rule exists)"
-  else
-    rm -f "${OUT:?}/classic-protection-${b:?}.json"
-  fi
+  probe "repos/$R/branches/$b/protection" "$OUT/classic-protection-$b.json"
+  case $? in
+    0) echo "found  classic-protection-$b.json (classic rule exists)" ;;
+    *) rm -f "${OUT:?}/classic-protection-${b:?}.json" ;;
+  esac
 done
 
 # Environments: protection rules, branch/tag policies, secret and variable names
-if envs=$(gh api "repos/$R/environments" --jq '.environments[].name' 2>"$OUT/environments.err"); then
+if envs=$(gh api --paginate "repos/$R/environments" --jq '.environments[].name' 2>"$OUT/environments.err"); then
   rm -f "${OUT:?}/environments.err"
   while IFS= read -r env; do
     [[ -n $env ]] || continue
     enc=$(jq -rn --arg e "$env" '$e | @uri')
     f="environments/$(echo "$env" | tr ' /' '__')"
     get "$f.json" "repos/$R/environments/$enc" '{name, protection_rules, deployment_branch_policy}'
-    get "$f.policies.json" "repos/$R/environments/$enc/deployment-branch-policies" '[.branch_policies[] | {name, type}]'
-    get "$f.secrets.json" "repos/$R/environments/$enc/secrets" '[.secrets[].name]'
-    get "$f.variables.json" "repos/$R/environments/$enc/variables" '[.variables[].name]'
+    names "$f.policies.json" "repos/$R/environments/$enc/deployment-branch-policies" '.branch_policies[] | "\(.type):\(.name)"'
+    names "$f.secrets.json" "repos/$R/environments/$enc/secrets" '.secrets[].name'
+    names "$f.variables.json" "repos/$R/environments/$enc/variables" '.variables[].name'
   done <<<"$envs"
 else
   echo "error  environments: $(head -c 200 "$OUT/environments.err")"
   ERRORS=$((ERRORS + 1))
 fi
 
-# Secrets and variables: names only
-get actions-secrets.json "repos/$R/actions/secrets" '[.secrets[].name]'
-get actions-variables.json "repos/$R/actions/variables" '[.variables[].name]'
-get dependabot-secrets.json "repos/$R/dependabot/secrets" '[.secrets[].name]'
-get org-secrets-visible.json "repos/$R/actions/organization-secrets" '[.secrets[].name]'
-get org-variables-visible.json "repos/$R/actions/organization-variables" '[.variables[].name]'
+# Secrets and variables: names only, all pages
+names actions-secrets.json "repos/$R/actions/secrets" '.secrets[].name'
+names actions-variables.json "repos/$R/actions/variables" '.variables[].name'
+names dependabot-secrets.json "repos/$R/dependabot/secrets" '.secrets[].name'
+names org-secrets-visible.json "repos/$R/actions/organization-secrets" '.secrets[].name'
+names org-variables-visible.json "repos/$R/actions/organization-variables" '.variables[].name'
+rm -f "${OUT:?}/.probe.err"
 
 echo "done   $OUT ($ERRORS errors)"
 [[ $ERRORS -eq 0 ]]

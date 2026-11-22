@@ -10,6 +10,9 @@
 # "<user>" in all other output. Reads no secrets and no configuration files
 # of the tools (only their --version output).
 #
+# linux.sh, macos.sh and windows.ps1 share helpers and the tool list by copy
+# (each runs on its own): change all three together.
+#
 # Usage: sh macos.sh [--with-identity] > machine.md
 
 # zsh does not split words by default; behave like sh

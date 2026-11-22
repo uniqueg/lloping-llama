@@ -13,7 +13,12 @@ set -uo pipefail
 
 input=$(cat)
 dir=${CLAUDE_STATUS_DIR:-/tmp/claude-$(id -u)/statusline}
-mkdir -p "$dir" && chmod 700 "$dir"
+# Only a directory of our own, so that no one else can read the status or
+# plant links in it
+if ! mkdir -p "$dir" || [[ ! -O $dir || -L $dir ]] || ! chmod 700 "$dir"; then
+    echo "status unavailable (unsafe $dir)"
+    exit 0
+fi
 
 session=$(jq -r '.session_id // "unknown"' <<<"$input" 2>/dev/null) || session=unknown
 # Atomic writes, so a reader never sees a half-written file
@@ -22,7 +27,9 @@ for name in "$session.json" latest.json; do
     printf '%s\n' "$input" >"$tmp" && mv -f "$tmp" "$dir/$name"
 done
 # The first status ever received, kept to check which fields exist
-[[ -e $dir/raw.json ]] || printf '%s\n' "$input" >"$dir/raw.json"
+if [[ ! -e $dir/raw.json ]] && tmp=$(mktemp "$dir/.tmp.XXXXXX"); then
+    printf '%s\n' "$input" >"$tmp" && mv -f "$tmp" "$dir/raw.json"
+fi
 
 # Liveness lamp: a yellow dot that switches on and off with every refresh
 # (state per session, so parallel sessions don't flip each other's lamp).

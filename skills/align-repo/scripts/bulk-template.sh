@@ -14,6 +14,8 @@
 #   (delete it to start over)
 # - log: every change, with time and result
 # - stops at the first unexpected result (non-zero exit, unexpected state)
+# - check_one and apply_one run in subshells with `set -e`, so a failing
+#   command anywhere in a kind stops the run (not only the last one)
 #
 # Usage: <script> [--apply]
 # Needs: gh (logged in, write access), jq.
@@ -50,22 +52,23 @@ apply_one() {
   esac
 }
 
-while IFS=$'\t' read -r id repo kind arg; do
+# (|| [[ -n $id ]]: also the last line if the file doesn't end in a newline)
+while IFS=$'\t' read -r id repo kind arg || [[ -n ${id:-} ]]; do
   [[ -z $id || $id == \#* ]] && continue
   if grep -qxF "$id" "$STATE"; then continue; fi
-  set +e; check_one "$repo" "$kind" "$arg"; rc=$?; set -e
+  set +e; (set -e; check_one "$repo" "$kind" "$arg"); rc=$?; set -e
   case $rc in
     0) ;;
     1) log "SKIP  $id $repo $kind $arg (already done)"; $APPLY && echo "$id" >>"$STATE"; continue ;;
     *) log "STOP  $id $repo $kind $arg (unexpected state)"; exit 1 ;;
   esac
   if ! $APPLY; then log "DRY   $id $repo $kind $arg"; continue; fi
-  if apply_one "$repo" "$kind" "$arg"; then
-    echo "$id" >>"$STATE"
-    log "DONE  $id $repo $kind $arg"
-  else
-    log "FAIL  $id $repo $kind $arg"
+  set +e; (set -e; apply_one "$repo" "$kind" "$arg"); rc=$?; set -e
+  if [[ $rc -ne 0 ]]; then
+    log "FAIL  $id $repo $kind $arg (exit $rc)"
     exit 1
   fi
+  echo "$id" >>"$STATE"
+  log "DONE  $id $repo $kind $arg"
 done <"$ACTIONS"
 log "END   $($APPLY && echo apply || echo dry-run)"

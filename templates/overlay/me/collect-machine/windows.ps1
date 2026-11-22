@@ -12,6 +12,9 @@ Privacy: prints no computer name, user name or home path unless you pass
 in all other output. Reads no secrets and no configuration files of the
 tools (only their --version output).
 
+linux.sh, macos.sh and windows.ps1 share helpers and the tool list by copy
+(each runs on its own): change all three together.
+
 .PARAMETER WithIdentity
 Also print the computer name, user name and home path, and keep them in the
 tool output.

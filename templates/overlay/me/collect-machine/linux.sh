@@ -8,6 +8,9 @@
 # "<user>" in all other output. Reads no secrets and no configuration files
 # of the tools (only their --version output).
 #
+# linux.sh, macos.sh and windows.ps1 share helpers and the tool list by copy
+# (each runs on its own): change all three together.
+#
 # Usage: bash linux.sh [--with-identity] > machine.md
 set -uo pipefail
 
