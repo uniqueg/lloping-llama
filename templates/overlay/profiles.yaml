@@ -10,7 +10,8 @@
 # Matching: the first entry in `repositories` whose `match` matches
 # `<owner>/<repo>` wins. `match` is an exact name or a glob (`*` matches any
 # characters except `/`). A repository without a match is unknown: the agent
-# asks you once, then records the answer here (`unknown: ask`).
+# asks you once, then records the answer here (`unknown: ask`; the
+# profile-gate hook then asks once per session, or denies with `unknown: deny`).
 #
 # The profile-gate hook (docs: "Profile gate") reads this file when
 # LLOPING_LLAMA_PROFILES points to it. It denies or asks before pushes and

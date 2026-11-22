@@ -11,15 +11,12 @@ set -uo pipefail
 script="$(dirname "${BASH_SOURCE[0]}")/profile_gate.py"
 input=$(cat)
 
-# Prefer a python3 that has PyYAML, then uv (which fetches PyYAML once), then
-# python3 without PyYAML (the gate then asks on every gated action)
-runs=()
-if python3 -c 'import yaml' >/dev/null 2>&1; then
-  runs+=("python3")
-elif command -v uv >/dev/null 2>&1; then
-  runs+=("uv run --quiet --no-project --script")
+# Prefer a python3 that has PyYAML; else uv (which fetches PyYAML once), with
+# python3 without PyYAML as a fallback (the gate then asks on gated actions)
+runs=("python3")
+if ! python3 -c 'import yaml' >/dev/null 2>&1 && command -v uv >/dev/null 2>&1; then
+  runs=("uv run --quiet --no-project --script" "python3")
 fi
-runs+=("python3")
 
 for run in "${runs[@]}"; do
   read -ra cmd <<<"$run"

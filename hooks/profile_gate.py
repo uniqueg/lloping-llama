@@ -32,7 +32,7 @@ import tempfile
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, get_args
 
 CONFIG_ENV = "LLOPING_LLAMA_PROFILES"
 STATE_ENV = "LLOPING_LLAMA_STATE_DIR"
@@ -46,16 +46,23 @@ PROFILES = (
     "developer",
     "contributor",
 )
-ACTIONS = ("push", "merge")
 MAX_DEPTH = 5
 MAX_SESSIONS = 50
 GIT_TIMEOUT = 5.0
 
 Kind = Literal["push", "merge"]
+ACTIONS: tuple[str, ...] = get_args(Kind)
 Verdict = Literal["deny", "ask"]
 
 # Tokens that end a simple command
 SEPARATORS = frozenset({"&&", "||", ";", ";;", "|", "|&", "&", "\n", "(", ")"})
+OPERATOR_CHARS = frozenset("();<>|&\n")
+OPERATOR = re.compile(r"&&|\|\||;;|\|&|[<>]+&?|&>|[;&|()\n]")
+# Shell keywords (and fish's and/or/not) that may precede a command
+KEYWORDS = frozenset(
+    {"{", "}", "!", "if", "then", "do", "else", "elif", "while", "until"}
+    | {"and", "or", "not", "begin"}
+)
 # Commands that run their arguments as a command: options that take a value
 WRAPPERS: dict[str, frozenset[str]] = {
     "builtin": frozenset(),
@@ -92,7 +99,8 @@ GIT_VALUE_OPTIONS = frozenset(
 # passed on to the git commands that resolve the target repository
 GIT_CONTEXT_OPTIONS = frozenset({"-C", "-c", "--git-dir", "--work-tree"})
 # Built-in git commands (git doesn't let aliases override them); anything else
-# may be an alias and is looked up
+# may be an alias and is looked up. Only an optimisation: a missing name costs
+# one `git config` call
 GIT_BUILTINS = frozenset(
     [
         "add",
@@ -219,12 +227,12 @@ API_RULES: tuple[tuple[re.Pattern[str], frozenset[str], Kind], ...] = (
     (re.compile(r"^pulls/\d+/update-branch$"), frozenset({"PUT"}), "push"),
 )
 URL_PATTERNS = (
-    # scp-like: git@github.com:owner/repo.git
-    re.compile(r"^(?:[^@/]+@)?(?P<host>[^:/]+):(?P<path>[^/].*)$"),
     # ssh://, git://, https://, with optional user and port
     re.compile(
         r"^[a-z][a-z0-9+.-]*://(?:[^@/]+@)?(?P<host>[^:/]+)(?::\d+)?/(?P<path>.*)$"
     ),
+    # scp-like: git@github.com:owner/repo.git
+    re.compile(r"^(?:[^@/]+@)?(?P<host>[^:/]+):(?P<path>[^/].*)$"),
 )
 
 
@@ -283,11 +291,13 @@ class RepoEntry:
         pattern: The repository name or glob, lower case.
         profile: The profile name.
         data: The whole entry, for the profile's fields.
+        allowed: The entry's ``allowed_actions``.
     """
 
     pattern: str
     profile: str
     data: Mapping[str, Any]
+    allowed: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
@@ -300,12 +310,15 @@ class Profiles:
         mapped: Entries of ``repos`` (a mapping; exact name, then first glob).
         allowed: Actions each profile allows (``allowed_actions`` in
             ``profiles``).
+        unknown: What to do for unknown repositories: ``ask`` (once per
+            session) or ``deny``.
     """
 
     path: Path
     listed: tuple[RepoEntry, ...]
     mapped: tuple[RepoEntry, ...]
     allowed: Mapping[str, frozenset[str]]
+    unknown: Verdict = "ask"
 
     def lookup(self, repo: str) -> RepoEntry | None:
         """Find the entry for a repository.
@@ -314,7 +327,25 @@ class Profiles:
             repo: The repository, as normalised by ``normalise_repo``.
 
         Returns:
-            The matching entry, or None if the repository is unknown.
+            The matching entry, or None if the repository is unknown. A
+            repository outside github.com that has no entry of its own is
+            looked up as ``owner/repo``, so that SSH host aliases of GitHub
+            get its profile.
+        """
+        entry = self._lookup(repo)
+        if entry is None and repo.count("/") == 2:
+            # A host other than github.com, e.g. an SSH alias for it
+            entry = self._lookup(repo.split("/", 1)[1])
+        return entry
+
+    def _lookup(self, repo: str) -> RepoEntry | None:
+        """Find the entry for a repository name as given.
+
+        Args:
+            repo: The repository.
+
+        Returns:
+            The matching entry, or None.
         """
         for entry in self.listed:
             if glob_match(entry.pattern, repo):
@@ -376,7 +407,7 @@ def repo_from_url(url: str) -> str | None:
         The normalised repository, or None for local paths and URLs that
         don't name ``owner/repo``.
     """
-    for pattern in URL_PATTERNS[::-1]:
+    for pattern in URL_PATTERNS:
         m = pattern.match(url)
         if m:
             return normalise_repo(m["host"], m["path"])
@@ -416,12 +447,32 @@ def tokenize(command: str) -> list[str]:
         ValueError: If the command has unbalanced quotes.
     """
     lexer = shlex.shlex(
-        command.replace("\\\n", " "), posix=True, punctuation_chars="();<>|&\n"
+        command.replace("\\\n", " ").replace("`", " ; "),
+        posix=True,
+        punctuation_chars="();<>|&\n",
     )
     lexer.whitespace = " \t\r"
     lexer.commenters = ""
     lexer.whitespace_split = True
     return list(lexer)
+
+
+def split_operators(tokens: Sequence[str]) -> list[str]:
+    """Split operator tokens that shlex joined (``&&`` and a newline, ``);``).
+
+    Args:
+        tokens: Output of ``tokenize``.
+
+    Returns:
+        The tokens, with each operator on its own.
+    """
+    out: list[str] = []
+    for token in tokens:
+        if token and set(token) <= OPERATOR_CHARS:
+            out += OPERATOR.findall(token)
+        else:
+            out.append(token)
+    return out
 
 
 def simple_commands(tokens: Sequence[str]) -> list[list[str]]:
@@ -436,7 +487,7 @@ def simple_commands(tokens: Sequence[str]) -> list[list[str]]:
     """
     commands: list[list[str]] = [[]]
     skip = False
-    for token in tokens:
+    for token in split_operators(tokens):
         if skip:
             skip = False
         elif token in ("(", ")"):
@@ -471,6 +522,9 @@ def strip_wrappers(words: list[str], ctx: Context) -> list[str]:
         if ASSIGNMENT.match(word):
             name, _, value = word.partition("=")
             ctx.env[name] = value
+            i += 1
+            continue
+        if word in KEYWORDS:
             i += 1
             continue
         name = os.path.basename(word)
@@ -741,10 +795,21 @@ def gh_actions(words: Sequence[str], ctx: Context) -> list[Action]:
     Raises:
         GateError: If a gated action's target can't be determined.
     """
-    if words[1:3] == ["pr", "merge"]:
-        return gh_pr_merge(words[3:], ctx)
-    if words[1:2] == ["api"]:
-        return gh_api(words[2:], ctx)
+    head: list[str] = []
+    rest = list(words[1:])
+    # Move --repo/-R given before the subcommand behind it
+    while rest and len(head) < 2:
+        arg = rest.pop(0)
+        if arg in ("-R", "--repo") and rest:
+            rest += [arg, rest.pop(0)]
+        elif arg.startswith(("--repo=", "-R")) and arg not in ("-R", "--repo"):
+            rest.append(arg)
+        else:
+            head.append(arg)
+    if head == ["pr", "merge"]:
+        return gh_pr_merge(rest, ctx)
+    if head[:1] == ["api"]:
+        return gh_api(head[1:] + rest, ctx)
     return []
 
 
@@ -803,14 +868,19 @@ def gh_api(args: Sequence[str], ctx: Context) -> list[Action]:
     endpoint = re.sub(r"^https?://[^/]+/(api/v3/)?", "", positionals[0]).lstrip("/")
     endpoint = endpoint.split("?", 1)[0]
     if endpoint == "graphql":
-        return graphql_actions(fields, ctx)
+        inputs = options.get("--input", [])
+        return graphql_actions(fields + [f"query=@{i}" for i in inputs], ctx)
     m = re.match(r"^repos/([^/]+)/([^/]+)/(.+)$", endpoint)
-    if not m:
+    by_id = re.match(r"^repositories/\d+/(.+)$", endpoint)
+    rest = m[3] if m else by_id[1] if by_id else None
+    if rest is None:
         return []
-    kinds = [k for p, ms, k in API_RULES if method in ms and p.match(m[3])]
+    kinds = [k for p, ms, k in API_RULES if method in ms and p.match(rest)]
     if not kinds:
         return []
     kind = kinds[0]
+    if m is None:
+        return [Action(kind, (), f"gh api {method} {endpoint}")]
     owner, name = m[1], m[2]
     if any(p.startswith(("{", ":")) for p in (owner, name)):
         repos = gh_default_repos(ctx)
@@ -841,6 +911,8 @@ def graphql_actions(fields: Sequence[str], ctx: Context) -> list[Action]:
         key, _, text = value.partition("=")
         if key != "query":
             continue
+        if text == "@-":
+            raise GateError("cannot read a GraphQL query from stdin")
         if text.startswith("@"):
             try:
                 base = ctx.cwd or Path.cwd()
@@ -896,6 +968,8 @@ def actions_in(command: str, cwd: Path | None, depth: int = 0) -> list[Action]:
         name = os.path.basename(words[0]).removesuffix(".exe")
         if name in ("cd", "pushd"):
             cwd = change_dir(cwd, words[1:])
+        elif name == "popd":
+            cwd = None
         elif name == "eval":
             actions += actions_in(" ".join(words[1:]), cwd, depth + 1)
         elif name in SHELLS:
@@ -994,7 +1068,10 @@ def load_profiles(path: Path) -> Profiles:
     entries_mapped = tuple(
         repo_entry(key, value, allowed, path) for key, value in mapped.items()
     )
-    return Profiles(path, entries_listed, entries_mapped, allowed)
+    unknown = data.get("unknown", "ask")
+    if unknown not in ("ask", "deny"):
+        raise GateError(f"{path}: `unknown` must be ask or deny")
+    return Profiles(path, entries_listed, entries_mapped, allowed, unknown)
 
 
 def allowed_actions(data: Mapping[str, Any], where: str, path: Path) -> frozenset[str]:
@@ -1041,8 +1118,9 @@ def repo_entry(
     profile = data.get("profile")
     if profile not in allowed:
         raise GateError(f"{path}: {pattern}: unknown profile {profile!r}")
-    allowed_actions(data, pattern, path)
-    return RepoEntry(pattern.lower(), str(profile), data)
+    return RepoEntry(
+        pattern.lower(), str(profile), data, allowed_actions(data, pattern, path)
+    )
 
 
 def names(value: object, fallback: str) -> str:
@@ -1075,9 +1153,7 @@ def decide(
         The verdict, or None if the profile allows the action.
     """
     data = entry.data
-    allowed = profiles.allowed[entry.profile] | allowed_actions(
-        data, repo, profiles.path
-    )
+    allowed = profiles.allowed[entry.profile] | entry.allowed
     if action.kind in allowed:
         return None
     where = f"{action.what} in {repo} ({entry.profile})"
@@ -1200,6 +1276,14 @@ def evaluate(
             )
         for repo in action.repos:
             entry = profiles.lookup(repo)
+            if entry is None and profiles.unknown == "deny":
+                decisions.append(
+                    Decision(
+                        "deny",
+                        f"{PREFIX}{repo} has no profile; record one in {profiles.path}",
+                    )
+                )
+                continue
             if entry is None:
                 if first_ask(session, repo):
                     decisions.append(

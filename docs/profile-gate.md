@@ -21,8 +21,11 @@ profiles file. Set the variable in your user settings (`~/.claude/settings.json`
 }
 ```
 
-The hook needs `python3` with PyYAML, or [uv](https://docs.astral.sh/uv/) (it fetches PyYAML once).
-Without either, it asks before every gated action and says why.
+The hook needs `python3` with PyYAML, or [uv](https://docs.astral.sh/uv/), which fetches PyYAML on
+the first run. Without either, it asks before every gated action and says why; without `python3`,
+it asks before every Bash command. Claude Code lets a command through when a hook times out, so warm
+uv's cache once, e.g. `uv run --no-project --script hooks/profile_gate.py </dev/null` in the plugin
+folder.
 
 Without the plugin, register the script yourself, next to the `env` entry above:
 
@@ -36,7 +39,7 @@ Without the plugin, register the script yourself, next to the `env` entry above:
           {
             "type": "command",
             "command": "bash /path/to/lloping-llama/hooks/profile-gate",
-            "timeout": 30
+            "timeout": 60
           }
         ]
       }
@@ -57,7 +60,8 @@ merge   gh pr merge (also --auto); gh api PUT pulls/<n>/merge and POST merges
 
 Everything else passes: other `git` and `gh` commands, reads through `gh api`, and commands without
 `git` or `gh`. GraphQL calls (`gh api graphql`) that run a merging or ref-changing mutation (e.g.
-`mergePullRequest`, `createRef`) always ask, because they name their target by node ID.
+`mergePullRequest`, `createRef`), in a `query` field or an `--input` file, always ask, because
+they name their target by node ID. So do gated calls to `repositories/<id>/...` routes.
 
 ## Verdicts
 
@@ -74,7 +78,8 @@ unknown repository         ask once per session: record its profile in profiles.
 ```
 
 `-` means no objection. Where a command holds several gated actions, the strictest verdict counts
-(`deny` over `ask`), with the reasons of all actions that led to it.
+(`deny` over `ask`), with the reasons of all actions that led to it. `unknown: deny` in
+`profiles.yaml` denies gated actions on unknown repositories instead of asking.
 
 ### Allowing an action
 
@@ -116,8 +121,10 @@ gh api         repos/<owner>/<repo>/... in the endpoint; {owner}/{repo} as for g
 ```
 
 `git -C <dir>`, `-c`, `--git-dir` and `--work-tree` are honoured, and so is `cd <dir>` earlier in
-the same command (not out of a subshell). Names are matched case-insensitively as `owner/repo`;
-remotes outside github.com as `host/owner/repo`.
+the same command (not out of a subshell); after `popd` the directory counts as unknown. Names
+are matched case-insensitively as `owner/repo`; remotes outside github.com as `host/owner/repo`,
+and, if that has no entry, as `owner/repo`, so that SSH host aliases for GitHub (e.g.
+`github-work:owner/repo`) get the repository's profile.
 
 Where the gate can't tell the target of a gated action (an unknown remote, `cd -`, a directory that
 doesn't exist yet, unbalanced quotes), it asks.
@@ -125,9 +132,11 @@ doesn't exist yet, unbalanced quotes), it asks.
 ## Limits
 
 The gate guards against mistakes, not against a determined adversary. It reads the shell syntax that
-agents write: chains (`&&`, `||`, `;`, `|`, newlines), subshells, `VAR=value` prefixes, wrappers
-such as `env`, `sudo`, `timeout` and `command`, `bash -c`, `eval`, redirections and git aliases. It
-does not see through scripts in files, `export` in an earlier command, functions or `xargs` input.
+agents write: chains (`&&`, `||`, `;`, `|`, newlines), subshells, command substitution, loops and
+conditionals (`do`, `then`, `{`, `!`, fish's `and`/`or`), `VAR=value` prefixes, wrappers such as
+`env`, `sudo`, `timeout` and `command`, `bash -c`, `eval`, redirections and git aliases. It does
+not see through scripts in files, `export` in an earlier command, functions, `xargs` input or gh
+aliases (`gh alias set`).
 Heredocs are read as commands, so a heredoc line that looks like `git push` is checked too.
 
 ## Development

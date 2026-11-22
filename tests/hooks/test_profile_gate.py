@@ -676,3 +676,81 @@ def test_glob_match() -> None:
     assert not pg.glob_match("*", "a/b")
     assert pg.glob_match("a/b?", "a/bc")
     assert not pg.glob_match("a/b?", "a/b/")
+
+
+# Regressions from the review
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "git commit -m x &&\ngit push",
+        "cd . ;\ngit push",
+        "(cd .);git push",
+        "(cd . && git status)\ngit push",
+        "git status |\ngit push",
+        "for r in a b; do git push; done",
+        "if true; then git push; fi",
+        "while true; do git push; done",
+        "{ git push; }",
+        "! git push",
+        "echo `git push`",
+        "fish -c 'true; and git push'",
+        "pushd ../mine && popd && git push",
+    ],
+)
+def test_review_bypasses_are_gated(
+    make_repo: Callable[..., Path], profiles_list: Path, command: str
+) -> None:
+    """Operators glued to newlines, shell keywords, backticks and popd are seen."""
+    repo = make_repo(origin="git@github.com:upstream-org/tool.git")
+    make_repo("mine", origin="git@github.com:you/mine.git")
+    assert run(command, repo, profiles_list) is not None, command
+
+
+def test_gh_repo_flag_before_subcommand(tmp_path: Path, profiles_list: Path) -> None:
+    """-R/--repo between pr and merge still names the repository."""
+    for command in [
+        "gh pr --repo upstream-org/tool merge 1",
+        "gh pr -R upstream-org/tool merge 1",
+        "gh pr --repo=upstream-org/tool merge 1",
+        "gh pr -Rupstream-org/tool merge 1",
+    ]:
+        result = run(command, tmp_path, profiles_list)
+        assert result is not None and result[0] == "deny", command
+    assert run("gh pr --repo upstream-org/tool view 1", tmp_path, profiles_list) is None
+
+
+def test_api_by_repository_id_asks(tmp_path: Path, profiles_list: Path) -> None:
+    """repositories/<id> routes to gated endpoints ask."""
+    result = run(
+        "gh api -X PUT repositories/123/pulls/1/merge", tmp_path, profiles_list
+    )
+    assert result is not None and "cannot tell which repository" in result[1]
+    assert run("gh api repositories/123/issues", tmp_path, profiles_list) is None
+
+
+def test_graphql_input(tmp_path: Path, profiles_list: Path) -> None:
+    """GraphQL bodies from --input are checked; stdin asks."""
+    (tmp_path / "m.json").write_text('{"query": "mutation { mergePullRequest }"}')
+    assert run("gh api graphql --input m.json", tmp_path, profiles_list) is not None
+    result = run("gh api graphql -F query=@-", tmp_path, profiles_list)
+    assert result is not None and "stdin" in result[1]
+
+
+def test_ssh_host_alias(make_repo: Callable[..., Path], profiles_list: Path) -> None:
+    """A remote on an SSH host alias gets the owner/repo profile."""
+    repo = make_repo(origin="github-work:upstream-org/tool.git")
+    result = run("git push", repo, profiles_list)
+    assert result is not None and result[0] == "deny"
+
+
+def test_unknown_deny(tmp_path: Path) -> None:
+    """unknown: deny denies gated actions on unknown repositories."""
+    path = tmp_path / "deny.yaml"
+    path.write_text("unknown: deny\n")
+    result = run("gh pr merge -R a/b", tmp_path, path)
+    assert result is not None and result[0] == "deny"
+    path.write_text("unknown: maybe\n")
+    result = run("gh pr merge -R a/b", tmp_path, path)
+    assert result is not None and "`unknown` must be" in result[1]
