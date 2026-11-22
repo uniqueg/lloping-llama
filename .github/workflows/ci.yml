@@ -134,9 +134,10 @@ jobs:
           c=templates/overlay/me/collect-machine/macos.sh
           EDITOR="$HOME/bin/$(id -un)-editor" zsh "$c" >"$RUNNER_TEMP/machine.md" 2>"$RUNNER_TEMP/err"
           EDITOR="$HOME/bin/$(id -un)-editor" sh "$c" >"$RUNNER_TEMP/machine-sh.md" 2>>"$RUNNER_TEMP/err"
-          # Same output in both shells (apart from the date line)
-          diff <(grep -v '^<!-- Generated' "$RUNNER_TEMP/machine.md") \
-            <(grep -v '^<!-- Generated' "$RUNNER_TEMP/machine-sh.md")
+          # Same output in both shells, apart from the date line and the
+          # terminal (bash as sh sets TERM=dumb when it is unset)
+          diff <(grep -vE '^(<!-- Generated|- Terminal:)' "$RUNNER_TEMP/machine.md") \
+            <(grep -vE '^(<!-- Generated|- Terminal:)' "$RUNNER_TEMP/machine-sh.md")
           zsh "$c" --with-identity >"$RUNNER_TEMP/identity.md"
       - name: Run the machine-file collector (Windows)
         if: matrix.os == 'Windows'
