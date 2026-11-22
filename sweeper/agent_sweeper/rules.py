@@ -215,7 +215,7 @@ class World:
         rescues: Existing rescues.
         disk_pct: Usage of the disk in percent.
         last_notify: Time of the last disk notification, if any.
-        notify: Program that sends the disk notification; None sends none.
+        notify: Command that sends the disk notification; None sends none.
         missing_paths: Ledger clone paths that do not exist.
         unreadable: Clone names whose ledger entry cannot be read; their
             clones are left alone.

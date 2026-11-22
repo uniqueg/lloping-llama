@@ -16,7 +16,7 @@ Environment=AGENT_CLONES=@CLONE_ROOT@
 # directories of tools installed through version managers (mise, asdf, ...)
 Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
 # Optional: a command called with one line when the disk is over 92 %
-#Environment=AGENT_SWEEP_NOTIFY=notify-send
+#Environment="AGENT_SWEEP_NOTIFY=notify-send -u critical"
 # Optional: the gh login to use, if not the default one
 #Environment=GH_CONFIG_DIR=%h/.config/gh
 Nice=15

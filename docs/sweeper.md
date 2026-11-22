@@ -19,7 +19,7 @@ Nothing is installed with pip. `gh`, `docker`, `kind`, `k3d` and `kubectl` are u
   unpushed history plus a tarball of its uncommitted and untracked files. If the rescue fails, the
   clone stays.
 - **Secrets are never copied.** Files that match the secret-like patterns (see
-  [Rescue](#rules)) are left out of every rescue and only listed in its manifest. The patterns
+  [Rules](#rules), under Rescue) are left out of every rescue and only listed in its manifest. The patterns
   cover common credential files, not every possible secret: keep secrets out of agent clones, or
   name them so that they match. Rescue directories are mode 0700, their files 0600, and credentials in remote URLs
   are stripped from the manifest.
@@ -55,7 +55,8 @@ notification command    $AGENT_SWEEP_NOTIFY      (none)           called with on
                                                                   last argument when the disk is over
                                                                   92 %, at most once a day; split like
                                                                   a shell command line (no shell runs),
-                                                                  e.g. notify-send -u critical
+                                                                  e.g. notify-send -u critical (quote
+                                                                  the whole assignment in the unit)
 gh login                $GH_CONFIG_DIR           gh's default     used for PR and compare lookups
 ```
 
@@ -77,8 +78,8 @@ no remote calls).
 The timer runs the commands from the plugin's directory, e.g. the marketplace clone at
 `~/.claude/plugins/marketplaces/lloping-llama` (kept current by `/plugin marketplace update`), or
 any clone of the repository. The steps below are for `bash` or `zsh`; they are safe to re-run.
-Both paths must be absolute and must not contain spaces, `%`, `|` or `&` (the unit templates are
-rendered with `sed`, and systemd expands `%` and splits on spaces).
+Both paths must be absolute and must not contain spaces, `%`, `$`, `|`, `&` or backslashes (the
+unit templates are rendered with `sed`, and systemd expands `%` and `$` and splits on spaces).
 
 **1. Render the unit templates and write a dry-run plan.** This enables nothing. The block runs in
 a subshell that stops at the first failing step.
@@ -89,7 +90,7 @@ set -e
 PLUGIN_DIR=~/.claude/plugins/marketplaces/lloping-llama
 CLONE_ROOT=~/agent-clones
 test -x "$PLUGIN_DIR/bin/agent-sweep"
-case "$PLUGIN_DIR$CLONE_ROOT" in *[[:space:]%\|\&\\]*) echo "unsupported character in a path" >&2; exit 1 ;; esac
+case "$PLUGIN_DIR$CLONE_ROOT" in *[[:space:]%\|\&\\\$]*) echo "unsupported character in a path" >&2; exit 1 ;; esac
 mkdir -p "$CLONE_ROOT" ~/.config/systemd/user ~/.cache
 sed -e "s|@PLUGIN_DIR@|$PLUGIN_DIR|g" -e "s|@CLONE_ROOT@|$CLONE_ROOT|g" \
   "$PLUGIN_DIR/templates/systemd/agent-sweep.service" >~/.config/systemd/user/agent-sweep.service
@@ -223,9 +224,12 @@ goes to `.rescue/<clone>-<date>[-n]/` and holds:
 Secret-like files match (in any case) `.env*` except `.env.example`, anything below `.kube/
 .ssh/ .gnupg/ .docker/ .aws/ .azure/ .gcloud/` or `.config/gh/ .config/gcloud/ .config/hub/
 .config/rclone/`, the names `.netrc .npmrc .pypirc .git-credentials .envrc .dev.vars
-credentials.json service-account.json secrets.yaml secrets.yml secrets.json`, the suffixes `.pem
-.key .p12 .pfx .jks .keystore .kubeconfig .tfvars .tfstate` and the prefixes `id_rsa id_ed25519
-id_ecdsa kubeconfig`. A rescue protects the clone only while its refs match the fingerprint in the manifest.
+credentials.json service-account.json`, `secrets.yaml secrets.yml secrets.json` (except below a
+`templates/` dir, as in Helm charts), kubeconfig files (`kubeconfig`, `kubeconfig-<x>`,
+`kubeconfig_<x>`, optionally with `.yaml .yml .json .conf`; not source files such as
+`kubeconfig.go`), names containing `.tfvars` or `.tfstate`, the suffixes `.pem .key .p12 .pfx .jks
+.keystore .kubeconfig` and the prefixes `id_rsa id_ed25519 id_ecdsa`. A rescue protects the clone
+only while its refs match the fingerprint in the manifest.
 A rescue fails (and is removed) if git cannot list the uncommitted files, an untracked nested
 repository is found, planning saw unpushed commits but no bundle results, or anything else goes
 wrong; a directory without a manifest never counts as a rescue. Rescues older than 90 days are

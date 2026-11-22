@@ -32,7 +32,7 @@ def test_default_notify(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     monkeypatch.delenv("AGENT_SWEEP_NOTIFY", raising=False)
     assert config.default_notify() is None
-    monkeypatch.setenv("AGENT_SWEEP_NOTIFY", "")
+    monkeypatch.setenv("AGENT_SWEEP_NOTIFY", " ")
     assert Config().notify is None
     monkeypatch.setenv("AGENT_SWEEP_NOTIFY", "notify-cmd")
     assert Config().notify == "notify-cmd"

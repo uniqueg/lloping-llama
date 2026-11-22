@@ -80,6 +80,20 @@ def test_is_secret() -> None:
         ".SSH/id",
         ".KUBE/config",
         "a/.Env",
+        ".azure/accessTokens.json",
+        ".gcloud/x",
+        ".config/hub",
+        "h/.config/hub/x",
+        ".config/rclone/rclone.conf",
+        "terraform.tfstate",
+        "infra/terraform.tfstate.backup",
+        "infra/terraform.tfvars.json",
+        "prod.auto.tfvars.json",
+        "kubeconfig",
+        "kubeconfig-kind",
+        "kubeconfig_dev.json",
+        "secrets.yml",
+        "secrets.json",
     ):
         assert config.is_secret(name), name
     for name in (
@@ -88,6 +102,13 @@ def test_is_secret() -> None:
         "tests/test_credentials.py",
         ".config/x",
         ".config/ghostty/config",
+        "gh/.config",
+        "src/config/gh/x.py",
+        "pkg/cluster/internal/kubeconfig/kubeconfig.go",
+        "pkg/kubeconfig_test.go",
+        "src/kubeconfig.py",
+        "KubeConfigLoader.java",
+        "charts/app/templates/secrets.yaml",
         "gh/hosts.yml",
         "docs/kubernetes.md",
     ):
@@ -536,6 +557,11 @@ def test_prune_and_notify(root: Path) -> None:
         == "done"
     )
     assert with_args.calls[-1][:3] == ["notify-cmd", "-u", "x"]
+    for bad in ('notify-cmd "x', "   "):
+        (root / ".ledger" / "state.json").unlink()
+        out = one(ex(root, runner=FakeRunner({})), Action("notify", "", bad, "d"))
+        assert (out.status, out.detail) == ("failed", "invalid notification command")
+        assert (root / ".ledger" / "state.json").exists()
 
 
 def test_delete_clone_in_use_after_rename(

@@ -698,9 +698,17 @@ class Executor:
         Returns:
             Status and detail.
         """
-        res = self.runner(
-            [*shlex.split(action.target), f"Agent sweeper: {action.reason}; clean up needed"],
-            timeout=config.TIMEOUT_NOTIFY,
+        try:
+            argv = shlex.split(action.target)
+        except ValueError:
+            argv = []
+        res = (
+            self.runner(
+                [*argv, f"Agent sweeper: {action.reason}; clean up needed"],
+                timeout=config.TIMEOUT_NOTIFY,
+            )
+            if argv
+            else None
         )
         state_file = self.cfg.ledger_dir / "state.json"
         try:
@@ -710,4 +718,6 @@ class Executor:
         state["last_notify"] = time.time()
         state_file.parent.mkdir(parents=True, exist_ok=True)
         state_file.write_text(json.dumps(state) + "\n")
+        if res is None:
+            return "failed", "invalid notification command"
         return ("done", "") if res.ok else ("failed", res.err.strip()[:200])

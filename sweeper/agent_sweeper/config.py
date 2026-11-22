@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import itertools
 import os
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -150,13 +151,14 @@ def default_root() -> Path:
 
 
 def default_notify() -> str | None:
-    """Return the program that sends the disk notification.
+    """Return the command that sends the disk notification.
 
     Returns:
-        ``$AGENT_SWEEP_NOTIFY`` if set and not empty, else None (no
-        notification; the disk usage is still in the summary).
+        ``$AGENT_SWEEP_NOTIFY`` (a command line, split with :mod:`shlex`)
+        if set and not blank, else None (no notification; the disk usage
+        is still in the summary).
     """
-    return os.environ.get("AGENT_SWEEP_NOTIFY") or None
+    return os.environ.get("AGENT_SWEEP_NOTIFY", "").strip() or None
 
 
 @dataclass(frozen=True)
@@ -169,7 +171,8 @@ class Config:
         cache_path: Where gh answers are cached; defaults to the ledger dir.
         fetch: Run ``git fetch --prune`` before checking reachability.
         disk_path: Mount point whose usage triggers the disk rules.
-        notify: Program called with one line of text when the disk is
+        notify: Command (split with :mod:`shlex`) called with one line of
+            text when the disk is
             nearly full; None sends nothing.
     """
 
@@ -238,11 +241,16 @@ SECRET_NAMES = frozenset(
         ".dev.vars",
         "credentials.json",
         "service-account.json",
-        "secrets.yaml",
-        "secrets.yml",
-        "secrets.json",
     }
 )
+#: Names that are secrets except below a ``templates`` dir (Helm charts).
+SECRET_DATA_NAMES = frozenset({"secrets.yaml", "secrets.yml", "secrets.json"})
+#: Kubeconfig files (``kubeconfig``, ``kubeconfig-kind.yaml``, ...), not
+#: source files such as ``kubeconfig.go``.
+KUBECONFIG_RE = re.compile(r"kubeconfig([-_][^.]*)?(\.(ya?ml|json|conf))?")
+#: Name parts of Terraform variables and state (``x.tfvars.json``,
+#: ``terraform.tfstate.backup``, ...).
+SECRET_INFIXES = (".tfvars", ".tfstate")
 SECRET_SUFFIXES = (
     ".pem",
     ".key",
@@ -251,10 +259,8 @@ SECRET_SUFFIXES = (
     ".jks",
     ".keystore",
     ".kubeconfig",
-    ".tfvars",
-    ".tfstate",
 )
-SECRET_PREFIXES = ("id_rsa", "id_ed25519", "id_ecdsa", "kubeconfig")
+SECRET_PREFIXES = ("id_rsa", "id_ed25519", "id_ecdsa")
 
 
 def is_secret(rel: str) -> bool:
@@ -266,7 +272,7 @@ def is_secret(rel: str) -> bool:
     Returns:
         True for ``.env*`` (except ``.env.example``), files below ``.kube``,
         ``.ssh``, ``.config/gh`` and similar dirs (any case), credential
-        files (``.netrc``, ``.envrc``, ``kubeconfig*``, ...), keys,
+        files (``.netrc``, ``.envrc``, kubeconfig files, ...), keys,
         certificates and Terraform variables and state. Exact patterns only, so source files
         like ``auth/token.py`` are never dropped.
     """
@@ -279,8 +285,11 @@ def is_secret(rel: str) -> bool:
         name == ".env"
         or name.startswith(".env.")
         or any(p in SECRET_DIRS for p in dirs)
-        or any(a == ".config" and b in SECRET_CONFIG_DIRS for a, b in itertools.pairwise(dirs))
+        or any(a == ".config" and b in SECRET_CONFIG_DIRS for a, b in itertools.pairwise(parts))
         or name in SECRET_NAMES
+        or (name in SECRET_DATA_NAMES and "templates" not in dirs)
+        or KUBECONFIG_RE.fullmatch(name) is not None
+        or any(infix in name for infix in SECRET_INFIXES)
         or name.endswith(SECRET_SUFFIXES)
         or name.startswith(SECRET_PREFIXES)
     )
