@@ -4,6 +4,8 @@
 import os
 import sys
 
+if sys.version_info < (3, 12):
+    sys.exit("agent-ledger: Python 3.12 or later required")
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "..", "sweeper"))
 
 from agent_sweeper.ledger import main  # noqa: E402

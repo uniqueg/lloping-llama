@@ -46,7 +46,8 @@ agent-sweep         Linux,     autonomous cleanup of the agent clone root: build
                     python3    finished clones (after a rescue of unpushed work), recorded
                     >= 3.12,   resources; run hourly by a systemd user timer
                     git
-agent-ledger        python3    records which agent owns which clone and resources
+agent-ledger        POSIX,     records which agent owns which clone and resources
+                    python3
                     >= 3.12
 ```
 

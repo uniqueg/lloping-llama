@@ -9,7 +9,7 @@ root small without ever asking anything:
   safe (keeps them, or rescues the work before deleting) and logs every decision.
 
 Both are in the plugin's `bin/` (on the Bash tool's PATH while the plugin is enabled). They need
-Linux (they read `/proc`), Python 3.12 or later and `git`; nothing is installed with pip. `gh`,
+Python 3.12 or later as `python3`; `agent-sweep` also needs Linux (it reads `/proc`) and `git`; nothing is installed with pip. `gh`,
 `docker`, `kind`, `k3d` and `kubectl` are used when present.
 
 ## Safety guarantees
@@ -67,6 +67,8 @@ no remote calls).
 The timer runs the commands from the plugin's directory, e.g. the marketplace clone at
 `~/.claude/plugins/marketplaces/lloping-llama` (kept current by `/plugin marketplace update`), or
 any clone of the repository. The steps below are for `bash` or `zsh`; they are safe to re-run.
+Both paths must be absolute and must not contain spaces, `%`, `|` or `&` (the unit templates are
+rendered with `sed`, and systemd expands `%` and splits on spaces).
 
 **1. Render the unit templates and write a dry-run plan.** This enables nothing. The block runs in
 a subshell that stops at the first failing step.

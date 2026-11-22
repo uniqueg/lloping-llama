@@ -209,6 +209,57 @@ def test_main(populated: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) 
     assert len(calls) == 2
 
 
+def test_main_env_defaults(populated: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without ``--root`` the command uses ``$AGENT_CLONES`` and ``$AGENT_SWEEP_NOTIFY``.
+
+    Args:
+        populated: Fixture root.
+        monkeypatch: Pytest fixture.
+    """
+    calls: list[Config] = []
+
+    def fake_sweep(cfg: Config, plan_out: Path | None = None, online: bool | None = None) -> str:
+        calls.append(cfg)
+        return "ok\n"
+
+    monkeypatch.setattr(sweep, "sweep", fake_sweep)
+    monkeypatch.setenv("AGENT_CLONES", str(populated))
+    monkeypatch.setenv("AGENT_SWEEP_NOTIFY", "notify-cmd")
+    assert sweep.main(["--dry-run", "--offline"]) == 0
+    assert calls[-1].root == populated and calls[-1].notify == "notify-cmd"
+
+
+def test_notify_from_env(populated: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A real run above the hard disk limit calls the program in ``$AGENT_SWEEP_NOTIFY``.
+
+    Args:
+        populated: Fixture root.
+        tmp_path: Pytest fixture.
+        monkeypatch: Pytest fixture.
+    """
+    monkeypatch.setenv("AGENT_SWEEP_NOTIFY", "notify-cmd")
+    fake = runner()
+    sweep.sweep(
+        Config(root=populated, cache_path=tmp_path / "gh.json"),
+        online=True,
+        proc_scan=lambda: [],
+        disk_pct=93.0,
+        runner=fake,
+    )
+    assert any(c[0] == "notify-cmd" for c in fake.calls)
+    monkeypatch.delenv("AGENT_SWEEP_NOTIFY")
+    (populated / ".ledger" / "state.json").unlink()
+    quiet = runner()
+    sweep.sweep(
+        Config(root=populated, cache_path=tmp_path / "gh.json"),
+        online=True,
+        proc_scan=lambda: [],
+        disk_pct=93.0,
+        runner=quiet,
+    )
+    assert not any(c[0] == "notify-cmd" for c in quiet.calls)
+
+
 def test_summary_lists_secret_holders() -> None:
     """Clones kept for secret-like files are listed once in the summary."""
     outcomes = [

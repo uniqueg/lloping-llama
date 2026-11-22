@@ -477,9 +477,9 @@ def test_remove_namespace(root: Path, tmp_path: Path) -> None:
     remote = tmp_path / "remote.yaml"
     released = "released only: not a local kind/k3d cluster"
     cases = [
-        "current-context: kind-x\nclusters:\n- cluster:\n    server: https://rahti.example:6443\n",
+        "current-context: kind-x\nclusters:\n- cluster:\n    server: https://cluster.example:6443\n",
         "current-context: kind-x\n- cluster:\n    server: https://localhost.corp.example:6443\n",
-        "current-context: rahti\n- cluster:\n    server: https://127.0.0.1:6443\n",
+        "current-context: remote\n- cluster:\n    server: https://127.0.0.1:6443\n",
         "current-context: kind-x\n",
     ]
     for text in cases:

@@ -1,7 +1,8 @@
 # Lint Markdown, shell and PowerShell scripts; lint, type-check and test the
 # sweeper (Python); validate the plugin and marketplace manifests; build the
-# docs strictly; run the machine-file collectors on Linux, macOS and Windows. The gate job `passed` ("CI passed")
-# is the only required check of this workflow.
+# docs strictly; run the machine-file collectors on Linux, macOS and Windows.
+# The gate job `passed` ("CI passed") is the only required check of this
+# workflow.
 
 name: CI
 

@@ -11,3 +11,8 @@ updates:
     schedule:
       interval: weekly
     labels: ["type: dependencies"]
+  - package-ecosystem: pip
+    directory: /sweeper
+    schedule:
+      interval: weekly
+    labels: ["type: dependencies"]
