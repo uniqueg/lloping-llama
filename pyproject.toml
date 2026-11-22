@@ -1,5 +1,6 @@
 # Not a Python package: this file only pins the tools that build the docs
-# (`pip install .[docs]`, also on Read the Docs)
+# (`pip install .[docs]`, also on Read the Docs) and that check the Python
+# hooks (`pip install .[test]`, CI job `test`)
 [build-system]
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
@@ -17,6 +18,38 @@ docs = [
   "mkdocs>=1.6.1,<2",
   "mkdocs-material>=9.6,<10",
 ]
+test = [
+  "mypy>=1.13,<2",
+  "pytest>=8.3,<10",
+  "pytest-cov>=6.0,<8",
+  "ruff>=0.8,<1",
+]
 
 [tool.setuptools]
 packages = []
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["hooks"]
+addopts = "--cov --cov-branch --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+source = ["hooks"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "D", "ANN", "BLE", "PT", "SIM", "RUF"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+known-first-party = ["slack_send_guard"]
+
+[tool.mypy]
+strict = true
+files = ["hooks", "tests"]
+mypy_path = "hooks"
