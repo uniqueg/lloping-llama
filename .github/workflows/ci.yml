@@ -1,6 +1,6 @@
-# Lint Markdown, shell and PowerShell scripts; validate the plugin and
-# marketplace manifests; build the docs strictly; run the machine-file
-# collectors on Linux, macOS and Windows. The gate job `passed` ("CI passed")
+# Lint Markdown, shell and PowerShell scripts; lint, type-check and test the
+# sweeper (Python); validate the plugin and marketplace manifests; build the
+# docs strictly; run the machine-file collectors on Linux, macOS and Windows. The gate job `passed` ("CI passed")
 # is the only required check of this workflow.
 
 name: CI
@@ -98,6 +98,44 @@ jobs:
           NO_MKDOCS_2_WARNING: "1"
         run: mkdocs build --strict
 
+  sweeper:
+    name: Sweeper (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.14"]
+    defaults:
+      run:
+        working-directory: sweeper
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install the dev tools
+        run: pip install -e '.[test]'
+      - name: Lint
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Type check
+        run: mypy
+      - name: Test (100 % coverage)
+        run: pytest
+      - name: Run the commands from bin/
+        run: |
+          root=$(mktemp -d)
+          export AGENT_CLONES=$root
+          ../bin/agent-ledger new example-1 --repo example-org/example-repo
+          ../bin/agent-ledger show example-1
+          ../bin/agent-sweep --dry-run --offline
+
   smoke:
     name: Smoke test (${{ matrix.os }})
     runs-on: ${{ matrix.runner }}
@@ -187,6 +225,7 @@ jobs:
       - lint
       - plugin
       - docs
+      - sweeper
       - smoke
     runs-on: ubuntu-latest
     timeout-minutes: 5
