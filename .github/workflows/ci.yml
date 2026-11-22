@@ -1,0 +1,180 @@
+# Lint Markdown, shell and PowerShell scripts; validate the plugin and
+# marketplace manifests; build the docs strictly; run the machine-file
+# collectors on Linux, macOS and Windows. The gate job `passed` ("CI passed")
+# is the only required check of this workflow.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # Pinned tool versions; update them by hand (Dependabot doesn't see npx)
+  MARKDOWNLINT_CLI2_VERSION: 0.24.0
+  CLAUDE_CODE_VERSION: 2.1.318
+  PSSCRIPTANALYZER_VERSION: 1.24.0
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Lint Markdown
+        run: npx --yes "markdownlint-cli2@${MARKDOWNLINT_CLI2_VERSION}"
+      - name: Lint shell scripts
+        # shellcheck is preinstalled on GitHub's Ubuntu runners; every script
+        # with a shell shebang is checked, wherever it lives
+        run: |
+          mapfile -t scripts < <(git ls-files | while read -r f; do
+            head -n 1 "$f" | grep -qE '^#!.*\b(ba|z)?sh\b' && echo "$f"
+          done)
+          printf 'checking %s\n' "${scripts[@]}"
+          shellcheck "${scripts[@]}"
+      - name: Lint PowerShell scripts
+        shell: pwsh
+        run: |
+          Install-Module PSScriptAnalyzer -RequiredVersion $env:PSSCRIPTANALYZER_VERSION -Scope CurrentUser -Force
+          $results = git ls-files '*.ps1' | ForEach-Object { Invoke-ScriptAnalyzer -Path $_ -Severity Warning, Error }
+          $results | Format-Table -AutoSize
+          if ($results) { exit 1 }
+
+  plugin:
+    name: Plugin
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC: "1"
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: "22"
+      - name: Validate the plugin manifest and components
+        run: npx --yes "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}" plugin validate --strict .
+      - name: Validate the marketplace manifest
+        run: >-
+          npx --yes "@anthropic-ai/claude-code@${CLAUDE_CODE_VERSION}"
+          plugin validate --strict .claude-plugin/marketplace.json
+      - name: Check that plugin and marketplace agree
+        run: |
+          jq -e --slurpfile p .claude-plugin/plugin.json \
+            '.plugins | any(.name == $p[0].name and .source == "./")' \
+            .claude-plugin/marketplace.json
+
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Install the docs tools
+        run: pip install '.[docs]'
+      - name: Build the docs
+        env:
+          NO_MKDOCS_2_WARNING: "1"
+        run: mkdocs build --strict
+
+  smoke:
+    name: Smoke test (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: Linux
+            runner: ubuntu-latest
+          - os: macOS
+            runner: macos-latest
+          - os: Windows
+            runner: windows-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run the machine-file collector (Linux)
+        if: matrix.os == 'Linux'
+        run: bash templates/overlay/me/collect-machine/linux.sh > "$RUNNER_TEMP/machine.md"
+      - name: Run the machine-file collector (macOS, zsh and sh)
+        if: matrix.os == 'macOS'
+        run: |
+          zsh templates/overlay/me/collect-machine/macos.sh > "$RUNNER_TEMP/machine.md"
+          sh templates/overlay/me/collect-machine/macos.sh > "$RUNNER_TEMP/machine-sh.md"
+          diff <(grep -v '^- Shell' "$RUNNER_TEMP/machine.md") <(grep -v '^- Shell' "$RUNNER_TEMP/machine-sh.md")
+      - name: Run the machine-file collector (Windows)
+        if: matrix.os == 'Windows'
+        shell: pwsh
+        run: |
+          & templates/overlay/me/collect-machine/windows.ps1 | Out-File -Encoding utf8 "$env:RUNNER_TEMP/machine.md"
+          if (-not $?) { exit 1 }
+      - name: Check the output
+        # A machine file with an OS line, a tools section and no identity
+        # (user name, home path, host name) of the runner
+        shell: bash
+        run: |
+          f="$RUNNER_TEMP/machine.md"
+          cat "$f"
+          grep -q '^- OS: ' "$f"
+          grep -q '^## Tools' "$f"
+          user=$(id -un 2>/dev/null || echo "${USERNAME:-}")
+          host=$(hostname)
+          for s in "$user" "$HOME" "$host"; do
+            if [[ -n $s ]] && grep -qiF "$s" "$f"; then
+              echo "::error::the machine file contains identity: $s"
+              exit 1
+            fi
+          done
+
+  # The gate: the only required check of this workflow, a stable name
+  # independent of the jobs and their matrices. Runs always and needs every
+  # other job; passes only if all of them passed (no job is skipped on
+  # purpose). Add new jobs to `needs`
+  passed:
+    name: CI passed
+    if: always()
+    needs:
+      - lint
+      - plugin
+      - docs
+      - smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions: {}
+    steps:
+      - name: Check results of all jobs
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          jq -r 'to_entries[] | "\(.key): \(.value.result)"' <<<"$NEEDS"
+          jq -e 'all(.[]; .result == "success")' <<<"$NEEDS" >/dev/null

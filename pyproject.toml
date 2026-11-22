@@ -1,0 +1,22 @@
+# Not a Python package: this file only pins the tools that build the docs
+# (`pip install .[docs]`, also on Read the Docs)
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lloping-llama"
+version = "0.1.0"
+description = "Docs build of the lloping-llama Claude Code plugin"
+license = "Apache-2.0"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+docs = [
+  "mkdocs>=1.6.1,<2",
+  "mkdocs-material>=9.6,<10",
+]
+
+[tool.setuptools]
+packages = []

@@ -1,0 +1,22 @@
+# Markdown lint (markdownlint-cli2), run by the CI job `lint`
+config:
+  default: true
+  # Line length: prose is wrapped at about 100 characters; long links and
+  # tables in code blocks are fine
+  MD013:
+    line_length: 120
+    code_blocks: false
+    tables: false
+  # Agent and skill files start with YAML frontmatter, not a heading
+  MD041: false
+  # Inline HTML comments hold fill-in instructions in templates
+  MD033: false
+  # Material for MkDocs admonitions and tabs are indented by four spaces
+  MD046: false
+globs:
+  - "**/*.md"
+ignores:
+  - "site/**"
+  - ".venv/**"
+  - ".cache/**"
+  - "node_modules/**"

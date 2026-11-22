@@ -11,3 +11,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+
+# Python build metadata of the docs install
+*.egg-info/
+build/
