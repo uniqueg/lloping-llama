@@ -1,0 +1,86 @@
+# Repository profiles: which rights agents have in a repository, and whom
+# they involve. Rights follow the repository, not the session. Agents look up
+# a repository here before any GitHub action (issues, PRs, merges, releases).
+#
+# Fill in: replace the example repositories with yours. Keep the profile
+# definitions as they are, unless you want to change what a profile means for
+# you. People are referred to by their GitHub login; describe them in
+# me/people.md.
+#
+# Matching: the first entry in `repositories` whose `match` matches
+# `<owner>/<repo>` wins. `match` is an exact name or a glob (`*` matches any
+# characters except `/`). A repository without a match is unknown: the agent
+# asks you once, then records the answer here (`unknown: ask`).
+
+version: 1
+
+unknown: ask
+
+# The six profiles, from most to least rights.
+profiles:
+  owner-sole:
+    description: >-
+      You are the only owner. No restrictions beyond your global rules:
+      agents may create branches, open and merge PRs and prepare releases
+      as your rules allow.
+    decides: you
+  owner-blessed-maintainer:
+    description: >-
+      You own the repository, but a blessed maintainer runs it day to day.
+      Involve the maintainer in every decision (issues, design, merges,
+      releases). You may overrule when the maintainer is unavailable, under
+      time pressure, or when there is no consensus; agents say so when they
+      draft such a decision.
+    decides: maintainer, you as fallback
+    requires: [maintainer]
+  owner-shared:
+    description: >-
+      You share ownership with co-owners. Decisions need consensus with
+      them; agents draft proposals and wait for agreement before merging or
+      releasing.
+    decides: consensus of owners
+    requires: [co_owners]
+  maintainer:
+    description: >-
+      You maintain the repository for its owner. Decide only within the
+      responsibilities listed for the repository; everything else goes to
+      the owner as a question.
+    decides: you within responsibilities, otherwise the owner
+    requires: [owner, responsibilities]
+  developer:
+    description: >-
+      You develop in the repository. Issues and PRs follow the repository's
+      policy; you may create feature branches. Extra rights, if any, are
+      listed per repository.
+    decides: the repository's maintainers
+    requires: [owner]
+  contributor:
+    description: >-
+      You contribute from outside. Issues, and PRs from your fork only; no
+      branches in the repository, no merges, no labels or settings.
+    decides: the repository's maintainers
+
+# Examples: replace them with your repositories.
+repositories:
+  - match: example-org/example-site
+    profile: owner-blessed-maintainer
+    maintainer: alice
+  - match: example-org/example-sdk
+    profile: owner-shared
+    co_owners: [bob]
+  - match: other-org/example-service
+    profile: maintainer
+    owner: carol
+    responsibilities:
+      - CI and release workflows
+      - dependency updates
+  - match: other-org/example-tool
+    profile: developer
+    owner: carol
+    extra_rights: []
+  - match: upstream-org/*
+    profile: contributor
+  - match: you/*
+    profile: owner-sole
+  - match: example-org/*
+    profile: owner-sole
