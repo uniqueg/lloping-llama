@@ -40,7 +40,7 @@ Plugins can't set the status line, so add it to your `~/.claude/settings.json` y
 .claude-plugin/   plugin.json and marketplace.json
 agents/           adversarial-reviewer, quality-reviewer, contract-reviewer
 skills/           align-repo
-hooks/            event hooks (none yet)
+hooks/            event hooks (profile-gate)
 workflows/        Workflow tool scripts (none yet)
 bin/              claude-statusline (on the Bash tool's PATH while the plugin is enabled)
 templates/        overlay/: the structure of your private overlay, with fill-in instructions

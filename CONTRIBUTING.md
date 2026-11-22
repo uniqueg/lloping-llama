@@ -23,7 +23,7 @@ hooks/hooks.json          event hooks; scripts next to it, via ${CLAUDE_PLUGIN_R
 workflows/<name>.js       Workflow tool scripts
 bin/<name>                executables, on the Bash tool's PATH while the plugin is enabled
 templates/                files users copy (not loaded by the plugin)
-tests/                    smoke tests and the shell lint script (not loaded by the plugin)
+tests/                    smoke tests, the shell lint script and the hook tests (not loaded)
 ```
 
 Only plugin components go into `agents/` and `bin/`: every Markdown file in `agents/` is loaded as
@@ -47,7 +47,12 @@ npx --yes @anthropic-ai/claude-code@<CLAUDE_CODE_VERSION> plugin validate --stri
 npx --yes @anthropic-ai/claude-code@<CLAUDE_CODE_VERSION> plugin validate --strict .claude-plugin/marketplace.json
 # Docs
 python3 -m venv .venv && .venv/bin/pip install '.[docs]' && .venv/bin/mkdocs build --strict
+# Python hooks: lint, format, types, tests with 100% coverage
+.venv/bin/pip install '.[dev]'
+.venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/mypy && .venv/bin/pytest
 ```
+
+The Python checks don't run in CI yet; run them locally.
 
 PowerShell scripts are checked with PSScriptAnalyzer in CI, and the machine-file collectors run on
 Linux, macOS and Windows runners (job `smoke`).

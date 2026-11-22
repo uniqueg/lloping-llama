@@ -11,6 +11,11 @@
 # `<owner>/<repo>` wins. `match` is an exact name or a glob (`*` matches any
 # characters except `/`). A repository without a match is unknown: the agent
 # asks you once, then records the answer here (`unknown: ask`).
+#
+# The profile-gate hook (docs: "Profile gate") reads this file when
+# LLOPING_LLAMA_PROFILES points to it. It denies or asks before pushes and
+# merges that a profile doesn't allow; `allowed_actions: [merge]` (or `push`)
+# on a repository entry or a profile lets those actions through.
 
 version: 1
 
@@ -74,6 +79,7 @@ repositories:
     responsibilities:
       - CI and release workflows
       - dependency updates
+    allowed_actions: []   # e.g. [merge] if merges are yours to decide
   - match: other-org/example-tool
     profile: developer
     owner: carol

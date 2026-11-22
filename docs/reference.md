@@ -48,9 +48,21 @@ Files in `bin/` are on the Bash tool's PATH while the plugin is enabled. Plugins
 status line; see [Getting started](getting-started.md#add-the-status-line). The activity time uses
 GNU `find -printf` and is left out where that is missing (e.g. macOS).
 
-## Hooks and workflows
+## Hooks
 
-None yet. See `hooks/README.md` and `workflows/README.md`.
+```text
+Hook          Event               Needs                      Does
+------------  ------------------  -------------------------  ----------------------------------------
+profile-gate  PreToolUse (Bash)   bash; python3 with PyYAML  denies or asks before pushes and merges
+                                  or uv                      that the repository's profile doesn't
+                                                             allow; opt-in via LLOPING_LLAMA_PROFILES
+```
+
+See [Profile gate](profile-gate.md).
+
+## Workflows
+
+None yet. See `workflows/README.md`.
 
 ## Templates
 
