@@ -42,7 +42,16 @@ claude-statusline   bash, jq   status line: activity lamp, minutes since the las
                                write, model, directory, 5-hour and 7-day usage with time to
                                reset; saves the status JSON to $CLAUDE_STATUS_DIR (default
                                /tmp/claude-<uid>/statusline)
+agent-sweep         Linux,     autonomous cleanup of the agent clone root: build outputs,
+                    python3    finished clones (after a rescue of unpushed work), recorded
+                    >= 3.12,   resources; run hourly by a systemd user timer
+                    git
+agent-ledger        python3    records which agent owns which clone and resources
+                    >= 3.12
 ```
+
+The sweeper's Python package lives in `sweeper/` (standard library only, nothing to install); see
+[Agent sweeper](sweeper.md).
 
 Files in `bin/` are on the Bash tool's PATH while the plugin is enabled. Plugins can't set the
 status line; see [Getting started](getting-started.md#add-the-status-line). The activity time uses
@@ -65,4 +74,6 @@ templates/overlay/me/collect-machine/        linux.sh (bash), macos.sh (sh/zsh/b
 templates/overlay/orgs/example-org/          conventions.md, repo-policy.md
 templates/overlay/projects/example-project/  state.md, decisions.md, runbooks/, drafts/,
                                              reports/
+templates/systemd/                           agent-sweep.service (with placeholders) and
+                                             agent-sweep.timer
 ```

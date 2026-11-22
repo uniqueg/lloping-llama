@@ -42,8 +42,11 @@ agents/           adversarial-reviewer, quality-reviewer, contract-reviewer
 skills/           align-repo
 hooks/            event hooks (none yet)
 workflows/        Workflow tool scripts (none yet)
-bin/              claude-statusline (on the Bash tool's PATH while the plugin is enabled)
-templates/        overlay/: the structure of your private overlay, with fill-in instructions
+bin/              claude-statusline, agent-sweep, agent-ledger (on the Bash tool's PATH while the
+                  plugin is enabled)
+sweeper/          Python package of agent-sweep and agent-ledger, with its tests
+templates/        overlay/: the structure of your private overlay, with fill-in instructions;
+                  systemd/: the sweeper's user units
 docs/             the documentation (MkDocs Material)
 ```
 
@@ -54,6 +57,9 @@ docs/             the documentation (MkDocs Material)
   verify each finding and report; they never edit, commit or push.
 - **Align a repository** with your org's policy: `/lloping-llama:align-repo example-org/example-repo`
   (the policy lives in your overlay, see below).
+- **Clean up after agents**: `agent-ledger` records each agent's clone and resources, and
+  `agent-sweep` (hourly, systemd user timer) removes what is finished, after rescuing any unpushed
+  work. See the [Agent sweeper](https://lloping-llama.readthedocs.io/en/latest/sweeper/) page.
 - **Set up your overlay**: copy `templates/overlay/` into a new private repository, fill it in and
   import its `CLAUDE.md` from `~/.claude/CLAUDE.md`. See the
   [Overlay guide](https://lloping-llama.readthedocs.io/en/latest/overlay/).

@@ -22,6 +22,7 @@ skills/<name>/SKILL.md    skills, with reference files and scripts in the same f
 hooks/hooks.json          event hooks; scripts next to it, via ${CLAUDE_PLUGIN_ROOT}
 workflows/<name>.js       Workflow tool scripts
 bin/<name>                executables, on the Bash tool's PATH while the plugin is enabled
+sweeper/                  Python package behind bin/agent-sweep and bin/agent-ledger, with tests
 templates/                files users copy (not loaded by the plugin)
 tests/                    smoke tests and the shell lint script (not loaded by the plugin)
 ```
@@ -45,6 +46,9 @@ bash tests/smoke.sh
 # Plugin and marketplace manifests
 npx --yes @anthropic-ai/claude-code@<CLAUDE_CODE_VERSION> plugin validate --strict .
 npx --yes @anthropic-ai/claude-code@<CLAUDE_CODE_VERSION> plugin validate --strict .claude-plugin/marketplace.json
+# Sweeper (Python): lint, types, tests with 100 % coverage
+cd sweeper && python3 -m venv .venv && .venv/bin/pip install -e '.[test]' && .venv/bin/ruff check . \
+  && .venv/bin/ruff format --check . && .venv/bin/mypy && .venv/bin/pytest; cd ..
 # Docs
 python3 -m venv .venv && .venv/bin/pip install '.[docs]' && .venv/bin/mkdocs build --strict
 ```
