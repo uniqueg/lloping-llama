@@ -1,0 +1,13 @@
+{
+  "name": "lloping-llama",
+  "version": "0.1.0",
+  "description": "Skills, agents, hooks, workflows and templates for agent-assisted software and project work with Claude Code",
+  "author": {
+    "name": "Alexander Kanitz",
+    "url": "https://github.com/uniqueg"
+  },
+  "homepage": "https://lloping-llama.readthedocs.io/",
+  "repository": "https://github.com/uniqueg/lloping-llama",
+  "license": "Apache-2.0",
+  "keywords": ["code-review", "agents", "workflow", "github", "project-management"]
+}

@@ -1,0 +1,13 @@
+# Docs build
+/site/
+
+# Local environments and caches
+.venv/
+.cache/
+__pycache__/
+node_modules/
+
+# Secrets never belong here
+.env
+.env.*
+!.env.example
