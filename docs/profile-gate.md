@@ -132,11 +132,13 @@ doesn't exist yet, unbalanced quotes), it asks.
 ## Limits
 
 The gate guards against mistakes, not against a determined adversary. It reads the shell syntax that
-agents write: chains (`&&`, `||`, `;`, `|`, newlines), subshells, command substitution, loops and
-conditionals (`do`, `then`, `{`, `!`, fish's `and`/`or`), `VAR=value` prefixes, wrappers such as
-`env`, `sudo`, `timeout` and `command`, `bash -c`, `eval`, redirections and git aliases. It does
+agents write: chains (`&&`, `||`, `;`, `|`, newlines), subshells, command and process substitution
+(also in double quotes), loops and conditionals (`do`, `then`, `{`, `!`, fish's `and`/`or`),
+`VAR=value` prefixes, wrappers such as `env`, `sudo`, `timeout` and `command`, `bash -c`, `eval`,
+redirections and git aliases. It does
 not see through scripts in files, `export` in an earlier command, functions, `xargs` input or gh
-aliases (`gh alias set`).
+aliases (`gh alias set`), and a quoted argument made only of operator characters (e.g. `-o ";"`)
+splits the command there.
 Heredocs are read as commands, so a heredoc line that looks like `git push` is checked too.
 
 ## Development

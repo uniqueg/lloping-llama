@@ -56,6 +56,8 @@ Verdict = Literal["deny", "ask"]
 
 # Tokens that end a simple command
 SEPARATORS = frozenset({"&&", "||", ";", ";;", "|", "|&", "&", "\n", "(", ")"})
+# $(...), <(...), >(...) without nested parentheses, and `...`
+SUBSTITUTION = re.compile(r"[$<>]\(([^()]*)\)|`([^`]*)`")
 OPERATOR_CHARS = frozenset("();<>|&\n")
 OPERATOR = re.compile(r"&&|\|\||;;|\|&|[<>]+&?|&>|[;&|()\n]")
 # Shell keywords (and fish's and/or/not) that may precede a command
@@ -795,17 +797,23 @@ def gh_actions(words: Sequence[str], ctx: Context) -> list[Action]:
     Raises:
         GateError: If a gated action's target can't be determined.
     """
+    # The first two words that aren't --repo/-R (which may come before the
+    # subcommand) name the command; the repository options go behind it
     head: list[str] = []
-    rest = list(words[1:])
-    # Move --repo/-R given before the subcommand behind it
-    while rest and len(head) < 2:
-        arg = rest.pop(0)
-        if arg in ("-R", "--repo") and rest:
-            rest += [arg, rest.pop(0)]
-        elif arg.startswith(("--repo=", "-R")) and arg not in ("-R", "--repo"):
-            rest.append(arg)
+    moved: list[str] = []
+    i = 1
+    while i < len(words) and len(head) < 2:
+        arg = words[i]
+        if arg in ("-R", "--repo"):
+            moved += words[i : i + 2]
+            i += 2
+        elif arg.startswith(("--repo=", "-R")):
+            moved.append(arg)
+            i += 1
         else:
             head.append(arg)
+            i += 1
+    rest = list(words[i:]) + moved
     if head == ["pr", "merge"]:
         return gh_pr_merge(rest, ctx)
     if head[:1] == ["api"]:
@@ -953,6 +961,10 @@ def actions_in(command: str, cwd: Path | None, depth: int = 0) -> list[Action]:
             raise GateError("cannot parse the command") from None
         return []
     actions: list[Action] = []
+    # Command and process substitutions, also inside double quotes, where the
+    # tokenizer keeps them in one word
+    for m in SUBSTITUTION.finditer(command):
+        actions += actions_in(m[1] or m[2] or "", cwd, depth + 1)
     stack: list[Path | None] = []
     for words in simple_commands(tokens):
         if words == ["("]:

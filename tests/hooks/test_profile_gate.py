@@ -754,3 +754,24 @@ def test_unknown_deny(tmp_path: Path) -> None:
     path.write_text("unknown: maybe\n")
     result = run("gh pr merge -R a/b", tmp_path, path)
     assert result is not None and "`unknown` must be" in result[1]
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gh browse -R upstream-org/tool; git push",
+        "gh pr -R upstream-org/tool; git push",
+        "gh -R upstream-org/tool; git push",
+        "gh browse --repo=upstream-org/tool && git push",
+        'out="$(git push)"',
+        'echo "`git push`"',
+        "cat <(git push)",
+    ],
+)
+def test_round_two_regressions(
+    make_repo: Callable[..., Path], profiles_list: Path, command: str
+) -> None:
+    """Repository options without a subcommand end; quoted substitutions are seen."""
+    repo = make_repo(origin="git@github.com:upstream-org/tool.git")
+    result = run(command, repo, profiles_list)
+    assert result is not None and result[0] == "deny", command
