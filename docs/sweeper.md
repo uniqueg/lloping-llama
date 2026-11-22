@@ -9,8 +9,8 @@ root small without ever asking anything:
   safe (keeps them, or rescues the work before deleting) and logs every decision.
 
 Both are in the plugin's `bin/` (on the Bash tool's PATH while the plugin is enabled). They need
-Python 3.12 or later as `python3`; `agent-sweep` also needs Linux (it reads `/proc`) and `git`; nothing is installed with pip. `gh`,
-`docker`, `kind`, `k3d` and `kubectl` are used when present.
+Python 3.12 or later as `python3`; `agent-sweep` also needs Linux (it reads `/proc`) and `git`.
+Nothing is installed with pip. `gh`, `docker`, `kind`, `k3d` and `kubectl` are used when present.
 
 ## Safety guarantees
 
@@ -18,8 +18,10 @@ Python 3.12 or later as `python3`; `agent-sweep` also needs Linux (it reads `/pr
   only after 14 days without changes, and only after a rescue succeeded: a git bundle of its
   unpushed history plus a tarball of its uncommitted and untracked files. If the rescue fails, the
   clone stays.
-- **Secrets are never copied.** Secret-like files are left out of every rescue and only listed in
-  its manifest. Rescue directories are mode 0700, their files 0600, and credentials in remote URLs
+- **Secrets are never copied.** Files that match the secret-like patterns (see
+  [Rescue](#rules)) are left out of every rescue and only listed in its manifest. The patterns
+  cover common credential files, not every possible secret: keep secrets out of agent clones, or
+  name them so that they match. Rescue directories are mode 0700, their files 0600, and credentials in remote URLs
   are stripped from the manifest.
 - **Clones with secret-like files are kept.** If a clone holds secret-like files that git does not
   hold unchanged (untracked, ignored or modified), a rescue would be incomplete, so the clone is
@@ -49,10 +51,18 @@ Python 3.12 or later as `python3`; `agent-sweep` also needs Linux (it reads `/pr
 Setting                 Where                    Default          Meaning
 ----------------------  -----------------------  ---------------  -------------------------------------
 clone root              $AGENT_CLONES or --root  ~/agent-clones   directory that holds the agent clones
-notification program    $AGENT_SWEEP_NOTIFY      (none)           called with one line of text when the
-                                                                  disk is over 92 %, at most once a day
+notification command    $AGENT_SWEEP_NOTIFY      (none)           called with one line of text as its
+                                                                  last argument when the disk is over
+                                                                  92 %, at most once a day; split like
+                                                                  a shell command line (no shell runs),
+                                                                  e.g. notify-send -u critical
 gh login                $GH_CONFIG_DIR           gh's default     used for PR and compare lookups
 ```
+
+Sessions and agents that run `agent-ledger` must see the same clone root as the timer: if you use
+another root than `~/agent-clones`, also export `AGENT_CLONES` for them (in your shell profile or
+in the `env` block of Claude Code's `settings.json`). Otherwise `agent-ledger` writes to a ledger
+that the sweeper never reads.
 
 The ledger, logs, rescues and trash all live inside the clone root (`.ledger/`, `.rescue/`,
 `.trash/`). Thresholds (idle times, disk limits, the list of build output names) are constants in
@@ -79,18 +89,28 @@ set -e
 PLUGIN_DIR=~/.claude/plugins/marketplaces/lloping-llama
 CLONE_ROOT=~/agent-clones
 test -x "$PLUGIN_DIR/bin/agent-sweep"
+case "$PLUGIN_DIR$CLONE_ROOT" in *[[:space:]%\|\&\\]*) echo "unsupported character in a path" >&2; exit 1 ;; esac
 mkdir -p "$CLONE_ROOT" ~/.config/systemd/user ~/.cache
 sed -e "s|@PLUGIN_DIR@|$PLUGIN_DIR|g" -e "s|@CLONE_ROOT@|$CLONE_ROOT|g" \
   "$PLUGIN_DIR/templates/systemd/agent-sweep.service" >~/.config/systemd/user/agent-sweep.service
 cp "$PLUGIN_DIR/templates/systemd/agent-sweep.timer" ~/.config/systemd/user/
 systemctl --user daemon-reload
 systemd-analyze verify --user ~/.config/systemd/user/agent-sweep.service ~/.config/systemd/user/agent-sweep.timer
+# The timer runs with the unit's PATH, not your shell's: check the tools there
+UNIT_PATH=$(sed -n 's/^Environment=PATH=//p' ~/.config/systemd/user/agent-sweep.service | sed "s|%h|$HOME|g")
+env PATH="$UNIT_PATH" python3 -c 'import sys; sys.exit(sys.version_info < (3, 12))'
+env PATH="$UNIT_PATH" sh -c 'command -v git'
+env PATH="$UNIT_PATH" sh -c 'for t in gh docker kind k3d kubectl; do command -v "$t" || echo "not on the unit PATH: $t"; done'
 AGENT_CLONES=$CLONE_ROOT "$PLUGIN_DIR/bin/agent-sweep" --dry-run \
   --cache "$HOME/.cache/agent-sweep-dry-run-gh.json" --plan-out "$HOME/.cache/agent-sweep-plan.txt"
 grep -q '; online$' ~/.cache/agent-sweep-plan.txt
 sed -n '1,40p' ~/.cache/agent-sweep-plan.txt
 )
 ```
+
+If `python3` or `git` is missing on the unit's PATH, the block stops there; tools you use that
+are reported as "not on the unit PATH" (e.g. installed through a version manager such as mise or
+asdf) need their directory added to `Environment=PATH=` in the service.
 
 The dry run takes a few minutes on many clones and prints a summary that starts with
 `Agent sweeper DRY RUN (nothing changed)`. If the block stops at `grep`, the run was `OFFLINE`
@@ -200,10 +220,12 @@ goes to `.rescue/<clone>-<date>[-n]/` and holds:
 - `manifest.json` (written last): what was rescued, the remote URL without credentials, the
   `excluded_secrets` and the restore commands.
 
-Secret-like files match `.env*` except `.env.example`, anything below `.kube/ .ssh/ .gnupg/
-.docker/ .aws/`, the names `.netrc .npmrc .pypirc .git-credentials kubeconfig credentials.json`,
-the suffixes `.pem .key .p12 .pfx .jks .keystore .kubeconfig` and the prefixes `id_rsa id_ed25519
-id_ecdsa`. A rescue protects the clone only while its refs match the fingerprint in the manifest.
+Secret-like files match (in any case) `.env*` except `.env.example`, anything below `.kube/
+.ssh/ .gnupg/ .docker/ .aws/ .azure/ .gcloud/` or `.config/gh/ .config/gcloud/ .config/hub/
+.config/rclone/`, the names `.netrc .npmrc .pypirc .git-credentials .envrc .dev.vars
+credentials.json service-account.json secrets.yaml secrets.yml secrets.json`, the suffixes `.pem
+.key .p12 .pfx .jks .keystore .kubeconfig .tfvars .tfstate` and the prefixes `id_rsa id_ed25519
+id_ecdsa kubeconfig`. A rescue protects the clone only while its refs match the fingerprint in the manifest.
 A rescue fails (and is removed) if git cannot list the uncommitted files, an untracked nested
 repository is found, planning saw unpushed commits but no bundle results, or anything else goes
 wrong; a directory without a manifest never counts as a rescue. Rescues older than 90 days are
@@ -223,7 +245,8 @@ clone untouched, since it may have held a pin; an unknown state counts as `runni
 an entry follow the same rules from git, gh and mtimes.
 
 **Disk.** Above 85 %: the build outputs of every idle clone go. Above 92 %: one notification via
-`$AGENT_SWEEP_NOTIFY`, at most once a day, without repository names.
+`$AGENT_SWEEP_NOTIFY` (if set), at most once a day (also after a failed attempt), without
+repository names.
 
 ## Outputs
 

@@ -7,6 +7,7 @@ that tests can point the sweeper at a temporary directory.
 
 from __future__ import annotations
 
+import itertools
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -224,12 +225,36 @@ def is_build_output(name: str, git: bool = True) -> bool:
 
 
 #: Secret-like paths (see :func:`is_secret`).
-SECRET_DIRS = frozenset({".kube", ".ssh", ".gnupg", ".docker", ".aws"})
+SECRET_DIRS = frozenset({".kube", ".ssh", ".gnupg", ".docker", ".aws", ".azure", ".gcloud"})
+#: Directories below ``.config`` that hold credentials (gh, gcloud, ...).
+SECRET_CONFIG_DIRS = frozenset({"gh", "gcloud", "hub", "rclone"})
 SECRET_NAMES = frozenset(
-    {".netrc", ".npmrc", ".pypirc", ".git-credentials", "kubeconfig", "credentials.json"}
+    {
+        ".netrc",
+        ".npmrc",
+        ".pypirc",
+        ".git-credentials",
+        ".envrc",
+        ".dev.vars",
+        "credentials.json",
+        "service-account.json",
+        "secrets.yaml",
+        "secrets.yml",
+        "secrets.json",
+    }
 )
-SECRET_SUFFIXES = (".pem", ".key", ".p12", ".pfx", ".jks", ".keystore", ".kubeconfig")
-SECRET_PREFIXES = ("id_rsa", "id_ed25519", "id_ecdsa")
+SECRET_SUFFIXES = (
+    ".pem",
+    ".key",
+    ".p12",
+    ".pfx",
+    ".jks",
+    ".keystore",
+    ".kubeconfig",
+    ".tfvars",
+    ".tfstate",
+)
+SECRET_PREFIXES = ("id_rsa", "id_ed25519", "id_ecdsa", "kubeconfig")
 
 
 def is_secret(rel: str) -> bool:
@@ -240,18 +265,21 @@ def is_secret(rel: str) -> bool:
 
     Returns:
         True for ``.env*`` (except ``.env.example``), files below ``.kube``,
-        ``.ssh`` and similar dirs, credential files (``.netrc``, ``.npmrc``,
-        ...), keys and certificates. Exact patterns only, so source files
+        ``.ssh``, ``.config/gh`` and similar dirs (any case), credential
+        files (``.netrc``, ``.envrc``, ``kubeconfig*``, ...), keys,
+        certificates and Terraform variables and state. Exact patterns only, so source files
         like ``auth/token.py`` are never dropped.
     """
-    parts = rel.split("/")
-    name = parts[-1].lower()
+    parts = rel.lower().split("/")
+    name = parts[-1]
+    dirs = parts[:-1]
     if name == ".env.example":
         return False
     return (
         name == ".env"
         or name.startswith(".env.")
-        or any(p in SECRET_DIRS for p in parts[:-1])
+        or any(p in SECRET_DIRS for p in dirs)
+        or any(a == ".config" and b in SECRET_CONFIG_DIRS for a, b in itertools.pairwise(dirs))
         or name in SECRET_NAMES
         or name.endswith(SECRET_SUFFIXES)
         or name.startswith(SECRET_PREFIXES)

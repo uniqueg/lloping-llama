@@ -12,6 +12,7 @@ import datetime as dt
 import json
 import os
 import re
+import shlex
 import shutil
 import tarfile
 import time
@@ -686,7 +687,10 @@ class Executor:
         return "done", ""
 
     def do_notify(self, action: Action) -> tuple[str, str]:
-        """Send one disk notification with the program in the target.
+        """Send one disk notification with the command in the target.
+
+        The target is split like a shell command line (no shell runs), so
+        it may carry arguments, e.g. ``notify-send -u critical``.
 
         Args:
             action: The action.
@@ -695,7 +699,7 @@ class Executor:
             Status and detail.
         """
         res = self.runner(
-            [action.target, f"Agent sweeper: {action.reason}; clean up needed"],
+            [*shlex.split(action.target), f"Agent sweeper: {action.reason}; clean up needed"],
             timeout=config.TIMEOUT_NOTIFY,
         )
         state_file = self.cfg.ledger_dir / "state.json"

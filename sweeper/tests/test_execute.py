@@ -68,6 +68,18 @@ def test_is_secret() -> None:
         "deploy/kubeconfig",
         "c.p12",
         "id_rsa.pub",
+        ".envrc",
+        "kubeconfig.yaml",
+        "kind/kubeconfig.yml",
+        ".config/gh/hosts.yml",
+        "x/.config/gcloud/credentials.db",
+        "secrets.yaml",
+        "infra/prod.tfvars",
+        "service-account.json",
+        ".dev.vars",
+        ".SSH/id",
+        ".KUBE/config",
+        "a/.Env",
     ):
         assert config.is_secret(name), name
     for name in (
@@ -75,6 +87,9 @@ def test_is_secret() -> None:
         "src/secrets_manager.py",
         "tests/test_credentials.py",
         ".config/x",
+        ".config/ghostty/config",
+        "gh/hosts.yml",
+        "docs/kubernetes.md",
     ):
         assert not config.is_secret(name), name
 
@@ -515,6 +530,12 @@ def test_prune_and_notify(root: Path) -> None:
     (root / ".ledger" / "state.json").write_text("garbage")
     failing = ex(root, runner=FakeRunner({"notify-cmd": FAIL}))
     assert one(failing, Action("notify", "", "notify-cmd", "disk")).status == "failed"
+    with_args = FakeRunner({"notify-cmd": OK})
+    assert (
+        one(ex(root, runner=with_args), Action("notify", "", "notify-cmd -u x", "d")).status
+        == "done"
+    )
+    assert with_args.calls[-1][:3] == ["notify-cmd", "-u", "x"]
 
 
 def test_delete_clone_in_use_after_rename(
