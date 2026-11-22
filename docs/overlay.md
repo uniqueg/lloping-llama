@@ -87,12 +87,16 @@ overlay/
 - `auto`: agents may send messages to this person directly.
 
 `auto` is allowed **only for single persons**, never for channels, groups or mailing lists. Every
-automatically sent message ends with a note such as:
+automatically sent message ends with a note you can set in the file's front matter (default below,
+with your name from `owner`):
 
 ```text
-(Sent automatically by Claude on behalf of <your name>, without <your name>'s review; please treat
-with care.)
+(Sent automatically by Claude on behalf of <owner>, without their review; please treat with care.)
 ```
+
+The `message-drafts` skill and the Slack send guard hook read this file; see
+[Messages](messages.md) for the full schema, the drafts ledger (`todos/drafts.md`) and how to
+point the hook at your overlay.
 
 ## Rules for the overlay
 

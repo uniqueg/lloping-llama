@@ -23,11 +23,16 @@ parallel before every push of code changes.
 ## Skills
 
 ```text
-Skill        Call                                     Reads from the overlay
------------  ---------------------------------------  -------------------------------------------
-align-repo   /lloping-llama:align-repo <owner/repo>   profiles.yaml, orgs/<org>/repo-policy.md,
-                                                      me/machine.md
+Skill           Call                                          Overlay files
+--------------  --------------------------------------------  --------------------------------
+align-repo      /lloping-llama:align-repo <owner/repo>        profiles.yaml,
+                                                              orgs/<org>/repo-policy.md,
+                                                              me/machine.md
+message-drafts  /lloping-llama:message-drafts <to> <about>    me/people.md; writes
+                                                              todos/drafts.md
 ```
+
+`message-drafts` turns messages into unsent Slack drafts; see [Messages](messages.md).
 
 `align-repo` ships `scripts/export-settings.sh` (read-only export of repository settings, run by the
 repository owner) and `scripts/bulk-template.sh` (a resumable, dry-run-by-default skeleton for bulk
@@ -48,9 +53,22 @@ Files in `bin/` are on the Bash tool's PATH while the plugin is enabled. Plugins
 status line; see [Getting started](getting-started.md#add-the-status-line). The activity time uses
 GNU `find -printf` and is left out where that is missing (e.g. macOS).
 
-## Hooks and workflows
+## Hooks
 
-None yet. See `hooks/README.md` and `workflows/README.md`.
+```text
+Hook                 Event       Matcher                                    Needs
+-------------------  ----------  -----------------------------------------  ----------------------
+slack_send_guard.py  PreToolUse  mcp__.*__slack_(send|schedule)_message$    python3 (3.10+),
+                                                                            LLOPING_LLAMA_OVERLAY
+                                                                            or _PEOPLE
+```
+
+The guard denies Slack sends that the people file doesn't allow and fails closed; see
+[Messages](messages.md#the-slack-send-guard-hook).
+
+## Workflows
+
+None yet. See `workflows/README.md`.
 
 ## Templates
 
@@ -59,7 +77,8 @@ Path                                         What
 -------------------------------------------  ----------------------------------------------
 templates/overlay/                           the overlay structure (see the Overlay guide)
 templates/overlay/profiles.yaml              the six profiles and example repositories
-templates/overlay/me/people.md               people schema with send: draft | auto
+templates/overlay/me/people.md               people schema with send: draft | auto and the
+                                             auto-send note
 templates/overlay/me/collect-machine/        linux.sh (bash), macos.sh (sh/zsh/bash),
                                              windows.ps1 (PowerShell 5.1 and 7)
 templates/overlay/orgs/example-org/          conventions.md, repo-policy.md
