@@ -1,5 +1,6 @@
-# Not a Python package: this file only pins the tools that build the docs
-# (`pip install .[docs]`, also on Read the Docs)
+# Not a Python package: this file pins the tools that build the docs
+# (`pip install .[docs]`, also on Read the Docs) and those that check the
+# Python hooks (`pip install .[dev]`; see docs/contributing.md)
 [build-system]
 requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
@@ -17,6 +18,39 @@ docs = [
   "mkdocs>=1.6.1,<2",
   "mkdocs-material>=9.6,<10",
 ]
+dev = [
+  "mypy>=1.13",
+  "pytest>=8.3",
+  "pytest-cov>=6",
+  "pyyaml>=6",
+  "ruff>=0.8",
+  "types-pyyaml>=6",
+]
 
 [tool.setuptools]
 packages = []
+
+[tool.ruff]
+target-version = "py310"
+src = ["hooks", "tests/hooks"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "D", "UP", "S", "SIM", "RUF"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.per-file-ignores]
+# subprocess runs git with fixed arguments; tests use assert
+"hooks/profile_gate.py" = ["S603", "S607"]
+"tests/**" = ["S101", "S603", "S607"]
+
+[tool.mypy]
+strict = true
+files = ["hooks", "tests/hooks"]
+mypy_path = "hooks"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/hooks"]
+pythonpath = ["hooks"]
+addopts = "--cov=profile_gate --cov-branch --cov-report=term-missing --cov-fail-under=100"

@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+# PreToolUse hook (Bash): apply the repository profiles of profiles.yaml to
+# gh and git commands; see docs/profile-gate.md. Does nothing unless
+# LLOPING_LLAMA_PROFILES names the file. Runs profile_gate.py with a Python
+# that has PyYAML, or through uv; if the interpreter itself fails, the hook
+# asks, so that a broken gate never lets actions through silently.
+set -uo pipefail
+
+[[ -n ${LLOPING_LLAMA_PROFILES:-} ]] || exit 0
+
+script="$(dirname "${BASH_SOURCE[0]}")/profile_gate.py"
+input=$(cat)
+
+# Prefer a python3 that has PyYAML, then uv (which fetches PyYAML once), then
+# python3 without PyYAML (the gate then asks on every gated action)
+runs=()
+if python3 -c 'import yaml' >/dev/null 2>&1; then
+  runs+=("python3")
+elif command -v uv >/dev/null 2>&1; then
+  runs+=("uv run --quiet --no-project --script")
+fi
+runs+=("python3")
+
+for run in "${runs[@]}"; do
+  read -ra cmd <<<"$run"
+  if output=$(printf '%s' "$input" | "${cmd[@]}" "$script" 2>/dev/null); then
+    printf '%s' "$output"
+    exit 0
+  fi
+done
+printf '%s' '{"hookSpecificOutput": {"hookEventName": "PreToolUse", "permissionDecision": "ask", "permissionDecisionReason": "profile-gate: the hook failed to run (needs python3)"}}'
