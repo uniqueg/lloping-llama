@@ -23,7 +23,7 @@ hooks/hooks.json          event hooks; scripts next to it, via ${CLAUDE_PLUGIN_R
 workflows/<name>.js       Workflow tool scripts
 bin/<name>                executables, on the Bash tool's PATH while the plugin is enabled
 templates/                files users copy (not loaded by the plugin)
-tests/                    smoke tests and the shell lint script (not loaded by the plugin)
+tests/                    smoke tests, the shell lint script and the hook tests (not loaded)
 ```
 
 Only plugin components go into `agents/` and `bin/`: every Markdown file in `agents/` is loaded as

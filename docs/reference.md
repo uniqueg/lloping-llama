@@ -82,6 +82,16 @@ slack_send_guard.py  PreToolUse  mcp__.*__slack_(send|schedule)_message$    pyth
 The guard denies Slack sends that the people file doesn't allow and fails closed; see
 [Messages](messages.md#the-slack-send-guard-hook).
 
+```text
+Hook          Event               Needs                      Does
+------------  ------------------  -------------------------  ----------------------------------------
+profile-gate  PreToolUse (Bash)   bash; python3 with PyYAML  denies or asks before pushes and merges
+                                  or uv                      that the repository's profile doesn't
+                                                             allow; opt-in via LLOPING_LLAMA_PROFILES
+```
+
+See [Profile gate](profile-gate.md).
+
 ## Workflows
 
 None yet. See `workflows/README.md`.

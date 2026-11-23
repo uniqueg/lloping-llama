@@ -40,7 +40,8 @@ Plugins can't set the status line, so add it to your `~/.claude/settings.json` y
 .claude-plugin/   plugin.json and marketplace.json
 agents/           adversarial-reviewer, quality-reviewer, contract-reviewer
 skills/           align-repo, message-drafts
-hooks/            slack_send_guard.py (blocks Slack sends the people file doesn't allow)
+hooks/            slack_send_guard.py (blocks Slack sends the people file doesn't allow),
+                  profile-gate (applies the repository profiles to gh and git commands)
 workflows/        Workflow tool scripts (none yet)
 output-styles/    Terse: short replies, context only for decisions, minimal to-dos
 bin/              claude-statusline (on the Bash tool's PATH while the plugin is enabled)

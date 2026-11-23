@@ -112,5 +112,27 @@ if [[ $(uname -s) == Linux ]]; then
   check "collector rejects unknown options" fails bash "$collector" --bogus
 fi
 
+# profile-gate wrapper: silent without a profiles file and for ungated
+# commands; deny for a gated one with PyYAML (ask naming PyYAML without it
+# and without uv); ask when the interpreter fails
+gate=$root/hooks/profile-gate
+profiles=$root/templates/overlay/profiles.yaml
+merge='{"tool_name":"Bash","tool_input":{"command":"gh pr merge 1 -R upstream-org/x"},"cwd":"/","session_id":"smoke"}'
+out=$(env -u LLOPING_LLAMA_PROFILES bash "$gate" <<<"$merge")
+check "profile-gate is silent without profiles" test -z "$out"
+out=$(LLOPING_LLAMA_PROFILES=$profiles bash "$gate" <<<'{"tool_name":"Bash","tool_input":{"command":"ls"}}')
+check "profile-gate is silent for ungated commands" test -z "$out"
+out=$(LLOPING_LLAMA_PROFILES=$profiles LLOPING_LLAMA_STATE_DIR=$work/gate bash "$gate" <<<"$merge")
+if python3 -c 'import yaml' >/dev/null 2>&1 || command -v uv >/dev/null 2>&1; then
+  check "profile-gate denies a contributor merge" grep -q '"permissionDecision": "deny"' <<<"$out"
+else
+  check "profile-gate asks for PyYAML" grep -q 'PyYAML is missing' <<<"$out"
+fi
+mkdir -p "$work/nopython"
+printf '#!/bin/sh\nexit 1\n' >"$work/nopython/python3"
+chmod +x "$work/nopython/python3"
+out=$(PATH="$work/nopython:/usr/bin:/bin" LLOPING_LLAMA_PROFILES=$profiles bash "$gate" <<<"$merge")
+check "profile-gate asks when python3 fails" grep -q 'the hook failed to run' <<<"$out"
+
 echo "$failures failure(s)"
 [[ $failures -eq 0 ]]

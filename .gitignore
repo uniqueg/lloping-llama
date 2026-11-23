@@ -19,3 +19,6 @@ node_modules/
 # Python build metadata of the docs install
 *.egg-info/
 build/
+
+# Python checks
+.coverage

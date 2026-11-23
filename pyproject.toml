@@ -22,7 +22,9 @@ test = [
   "mypy>=1.13,<2",
   "pytest>=8.3,<10",
   "pytest-cov>=6.0,<8",
+  "pyyaml>=6",
   "ruff>=0.8,<1",
+  "types-pyyaml>=6",
 ]
 
 [tool.setuptools]
@@ -41,13 +43,18 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "D", "ANN", "BLE", "PT", "SIM", "RUF"]
+select = ["E", "F", "W", "I", "B", "UP", "D", "S", "ANN", "BLE", "PT", "SIM", "RUF"]
 
 [tool.ruff.lint.pydocstyle]
 convention = "google"
 
+[tool.ruff.lint.per-file-ignores]
+# subprocess runs git with fixed arguments; tests use assert
+"hooks/profile_gate.py" = ["S603", "S607"]
+"tests/**" = ["S101", "S603", "S607"]
+
 [tool.ruff.lint.isort]
-known-first-party = ["slack_send_guard"]
+known-first-party = ["profile_gate", "slack_send_guard"]
 
 [tool.mypy]
 strict = true

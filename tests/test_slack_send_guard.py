@@ -447,7 +447,11 @@ def test_script_runs(tmp_path: Path) -> None:
 def test_hooks_json() -> None:
     """hooks.json guards send and schedule, but not drafts."""
     config = json.loads((ROOT / "hooks" / "hooks.json").read_text(encoding="utf-8"))
-    (entry,) = config["hooks"]["PreToolUse"]
+    (entry,) = [
+        e
+        for e in config["hooks"]["PreToolUse"]
+        if "slack_send_guard.py" in e["hooks"][0]["command"]
+    ]
     matcher = re.compile(entry["matcher"])
     assert matcher.search("mcp__claude_ai_Slack__slack_send_message")
     assert matcher.search("mcp__slack__slack_schedule_message")
