@@ -1,0 +1,18 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "lloping-llama",
+  "description": "The lloping-llama plugin, installable straight from its repository",
+  "owner": {
+    "name": "Alexander Kanitz",
+    "url": "https://github.com/uniqueg"
+  },
+  "plugins": [
+    {
+      "name": "lloping-llama",
+      "source": "./",
+      "description": "Skills, agents, hooks, workflows and templates for agent-assisted software and project work with Claude Code",
+      "category": "development",
+      "homepage": "https://lloping-llama.readthedocs.io/"
+    }
+  ]
+}

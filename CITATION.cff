@@ -1,0 +1,22 @@
+cff-version: 1.2.0
+message: >-
+  If you use this software, please cite it using the metadata from this file.
+title: lloping-llama
+abstract: >-
+  A Claude Code plugin with skills, agents, hooks, workflows and templates
+  for agent-assisted software and project work, plus a template for a
+  private overlay that holds personal, organization and project context.
+type: software
+authors:
+  - given-names: Alexander
+    family-names: Kanitz
+    orcid: "https://orcid.org/0000-0002-3468-0652"
+repository-code: "https://github.com/uniqueg/lloping-llama"
+url: "https://lloping-llama.readthedocs.io/"
+keywords:
+  - Claude Code
+  - plugin
+  - AI agents
+  - code review
+  - developer tools
+license: Apache-2.0
