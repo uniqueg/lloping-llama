@@ -12,7 +12,7 @@ The building blocks of a Claude Code setup, and how lloping-llama uses them.
 **Skills**
 :   Folders with a `SKILL.md` (instructions plus a description of when to use them) and optional
     reference files and scripts. Claude loads a skill when its description matches the task, or
-    when you call it as `/<plugin>:<skill>`. Example: `align-repo`.
+    when you call it as `/<plugin>:<skill>`. Examples: `align-repo`, `message-drafts`.
 
 **Agents**
 :   Subagents: Markdown files with frontmatter (`name`, `description`, `tools`, `model`) that run
@@ -26,7 +26,8 @@ The building blocks of a Claude Code setup, and how lloping-llama uses them.
 **Hooks**
 :   Commands that Claude Code runs on events, e.g. before a tool call (`PreToolUse`). They can
     block an action, so they enforce rules that instructions alone can't, e.g. "no merges in
-    repositories where I am a contributor".
+    repositories where I am a contributor" or "no Slack messages to channels" (the Slack send
+    guard, see [Messages](messages.md)).
 
 **Profiles**
 :   Per-repository rights in your overlay's `profiles.yaml`: who decides, who merges, whom to

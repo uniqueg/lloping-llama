@@ -7,7 +7,7 @@ config``); no test calls gh or the network.
 from __future__ import annotations
 
 import subprocess
-from collections.abc import Callable, Iterator
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -81,22 +81,17 @@ def git(cwd: Path, *args: str) -> str:
     Returns:
         The stripped output.
     """
-    result = subprocess.run(
-        ["git", *args], cwd=cwd, capture_output=True, text=True, check=True
-    )
+    result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True)
     return result.stdout.strip()
 
 
 @pytest.fixture(autouse=True)
-def isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+def isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Isolate git and the state directory from the user's configuration.
 
     Args:
         tmp_path: The test's directory.
         monkeypatch: Pytest's monkeypatch.
-
-    Yields:
-        Nothing.
     """
     home = tmp_path / "home"
     home.mkdir()
@@ -106,7 +101,6 @@ def isolated_env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[No
     monkeypatch.setenv("LLOPING_LLAMA_STATE_DIR", str(tmp_path / "state"))
     for name in ("GH_REPO", "CLAUDE_PLUGIN_DATA", "XDG_STATE_HOME", "GIT_DIR"):
         monkeypatch.delenv(name, raising=False)
-    yield
 
 
 @pytest.fixture

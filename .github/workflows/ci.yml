@@ -1,6 +1,7 @@
 # Lint Markdown, shell and PowerShell scripts; validate the plugin and
 # marketplace manifests; build the docs strictly; run the machine-file
-# collectors on Linux, macOS and Windows. The gate job `passed` ("CI passed")
+# collectors on Linux, macOS and Windows; lint, type-check and test the
+# Python hooks. The gate job `passed` ("CI passed")
 # is the only required check of this workflow.
 
 name: CI
@@ -175,6 +176,35 @@ jobs:
           done
           grep -qiF -- "- User: $user" "$RUNNER_TEMP/identity.md"
 
+  test:
+    name: Test (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        # Oldest supported and newest
+        python: ["3.10", "3.13"]
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install the test tools
+        run: pip install '.[test]'
+      - name: Lint and format check the Python hooks
+        run: |
+          ruff check .
+          ruff format --check .
+      - name: Type check the Python hooks
+        run: mypy
+      - name: Test the Python hooks (100% coverage)
+        run: pytest
+
   # The gate: the only required check of this workflow, a stable name
   # independent of the jobs and their matrices. Runs always and needs every
   # other job; passes only if all of them passed (no job is skipped on
@@ -187,6 +217,7 @@ jobs:
       - plugin
       - docs
       - smoke
+      - test
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions: {}

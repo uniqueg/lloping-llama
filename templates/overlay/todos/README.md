@@ -11,4 +11,7 @@ Suggested item fields:
   links     issues, PRs, runbooks
   minutes   your hands-on time; waiting time (CI, reviews) named separately
   unblocks  what it unblocks (for ordering by impact)
+
+drafts.md (written by the message-drafts skill) lists unsent Slack drafts, one `- [ ]` line each;
+the board shows their count as "N drafts waiting".
 -->

@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from conftest import git
 
 import profile_gate as pg
-from conftest import git
 
 Result = tuple[str, str] | None
 
@@ -127,9 +127,7 @@ def test_push_uses_push_url_and_default_remote(
     assert run("git push origin", repo, profiles_list) is not None
 
 
-def test_push_branch_remote(
-    make_repo: Callable[..., Path], profiles_list: Path
-) -> None:
+def test_push_branch_remote(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """A branch's push remote and remote are used for a bare push."""
     repo = make_repo(
         origin="git@github.com:you/tool.git",
@@ -141,9 +139,7 @@ def test_push_branch_remote(
     assert run("git push", repo, profiles_list) is None
 
 
-def test_push_detached_head(
-    make_repo: Callable[..., Path], profiles_list: Path
-) -> None:
+def test_push_detached_head(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """A bare push without a current branch uses origin."""
     repo = make_repo(origin="git@github.com:upstream-org/tool.git")
     git(
@@ -162,27 +158,20 @@ def test_push_detached_head(
     assert run("git push", repo, profiles_list) is not None
 
 
-def test_push_options_and_repo(
-    make_repo: Callable[..., Path], profiles_list: Path
-) -> None:
+def test_push_options_and_repo(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """Options with values are skipped; --repo names the target."""
     repo = make_repo(
         origin="git@github.com:you/tool.git",
         upstream="git@github.com:upstream-org/tool.git",
     )
-    assert (
-        run("git push -o ci.skip --force-with-lease origin x", repo, profiles_list)
-        is None
-    )
+    assert run("git push -o ci.skip --force-with-lease origin x", repo, profiles_list) is None
     assert run("git push --repo upstream", repo, profiles_list) is not None
     assert run("git push --repo=upstream", repo, profiles_list) is not None
     assert run("git push --receive-pack", repo, profiles_list) is None
     assert run("git push -- upstream main", repo, profiles_list) is not None
 
 
-def test_push_to_url_and_path(
-    make_repo: Callable[..., Path], profiles_list: Path
-) -> None:
+def test_push_to_url_and_path(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """URLs are checked directly; local paths pass."""
     repo = make_repo()
     url = "https://github.com/upstream-org/tool.git"
@@ -191,9 +180,7 @@ def test_push_to_url_and_path(
     assert run("git push /srv/git/x.git main", repo, profiles_list) is None
 
 
-def test_push_unknown_remote_asks(
-    make_repo: Callable[..., Path], profiles_list: Path
-) -> None:
+def test_push_unknown_remote_asks(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """A remote name that doesn't resolve fails closed."""
     repo = make_repo()
     result = run("git push nowhere", repo, profiles_list)
@@ -203,22 +190,18 @@ def test_push_unknown_remote_asks(
 def test_push_outside_repo_asks(tmp_path: Path, profiles_list: Path) -> None:
     """A bare push outside a repository fails closed."""
     result = run("git push", tmp_path, profiles_list)
-    assert result is not None and "cannot tell" in result[1]
+    assert result is not None
+    assert "cannot tell" in result[1]
 
 
-def test_git_global_options(
-    make_repo: Callable[..., Path], profiles_list: Path
-) -> None:
+def test_git_global_options(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """-C, -c, --git-dir and other global options are honoured."""
     repo = make_repo("up", origin="git@github.com:upstream-org/tool.git")
     other = make_repo("other", origin="git@github.com:you/tool.git")
     assert run(f"git -C {repo} push", other, profiles_list) is not None
     assert run("git -C ../up push", other, profiles_list) is not None
     assert run(f"git --git-dir={repo}/.git push", other, profiles_list) is not None
-    assert (
-        run("git --no-pager -c push.default=simple push", repo, profiles_list)
-        is not None
-    )
+    assert run("git --no-pager -c push.default=simple push", repo, profiles_list) is not None
     url = "remote.origin.url=git@github.com:upstream-org/tool.git"
     assert run(f"git -c {url} push", other, profiles_list) is not None
     assert run("git --namespace x push", repo, profiles_list) is not None
@@ -226,9 +209,7 @@ def test_git_global_options(
     assert run("git", repo, profiles_list) is None
 
 
-def test_git_read_commands_pass(
-    make_repo: Callable[..., Path], profiles_list: Path
-) -> None:
+def test_git_read_commands_pass(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """Built-in git commands other than push pass without lookups."""
     repo = make_repo(origin="git@github.com:upstream-org/tool.git")
     assert run("git status && git log -1 && git fetch", repo, profiles_list) is None
@@ -246,14 +227,13 @@ def test_git_aliases(make_repo: Callable[..., Path], profiles_list: Path) -> Non
     assert run("git nosuchalias", repo, profiles_list) is None
 
 
-def test_git_alias_loop_asks(
-    make_repo: Callable[..., Path], profiles_list: Path
-) -> None:
+def test_git_alias_loop_asks(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """Recursive aliases stop at the depth limit and ask."""
     repo = make_repo(origin="git@github.com:upstream-org/tool.git")
     git(repo, "config", "alias.loop", "!git loop")
     result = run("git loop", repo, profiles_list)
-    assert result is not None and "nests too deeply" in result[1]
+    assert result is not None
+    assert "nests too deeply" in result[1]
 
 
 # Shell syntax
@@ -309,7 +289,8 @@ def test_cd_unknown_asks(
     repo = make_repo(origin="git@github.com:you/tool.git")
     for command in ["cd - && git push", "cd $X && git push", "cd -; cd sub; git push"]:
         result = run(command, repo, profiles_list)
-        assert result is not None and result[0] == "ask", command
+        assert result is not None, command
+        assert result[0] == "ask", command
     monkeypatch.setenv("HOME", str(repo))
     assert run("cd && git push", repo.parent, profiles_list) is None
 
@@ -359,7 +340,8 @@ def test_merge_profile_fallback_names(tmp_path: Path, profiles_mapping: Path) ->
     }
     for repo, needle in expected.items():
         result = run(f"gh pr merge --repo={repo}", tmp_path, profiles_mapping)
-        assert result is not None and needle in result[1]
+        assert result is not None
+        assert needle in result[1]
 
 
 def test_profile_level_allowed_actions(tmp_path: Path, profiles_mapping: Path) -> None:
@@ -367,9 +349,7 @@ def test_profile_level_allowed_actions(tmp_path: Path, profiles_mapping: Path) -
     assert run("gh pr merge -R other-org/dev", tmp_path, profiles_mapping) is None
 
 
-def test_merge_url_and_flags(
-    make_repo: Callable[..., Path], profiles_list: Path
-) -> None:
+def test_merge_url_and_flags(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """A PR URL names the repository; --disable-auto is no merge."""
     repo = make_repo(origin="git@github.com:you/tool.git")
     url = "https://github.com/upstream-org/tool/pull/3"
@@ -387,9 +367,7 @@ def test_merge_bad_repo_value_asks(tmp_path: Path, profiles_list: Path) -> None:
     assert result == ("ask", "profile-gate: cannot read the repository 'justaname'")
 
 
-def test_merge_default_repo(
-    make_repo: Callable[..., Path], profiles_list: Path
-) -> None:
+def test_merge_default_repo(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """The default repository: GH_REPO, gh-resolved, else the strictest remote."""
     repo = make_repo(
         origin="git@github.com:you/tool.git",
@@ -399,9 +377,7 @@ def test_merge_default_repo(
     assert run("gh pr merge 1", repo, profiles_list) is not None
     git(repo, "config", "remote.origin.gh-resolved", "base")
     assert run("gh pr merge 1", repo, profiles_list) is None
-    assert (
-        run("GH_REPO=upstream-org/tool gh pr merge 1", repo, profiles_list) is not None
-    )
+    assert run("GH_REPO=upstream-org/tool gh pr merge 1", repo, profiles_list) is not None
     assert run("GH_REPO=x gh pr merge 1", repo, profiles_list) is None
 
 
@@ -446,7 +422,8 @@ def test_other_gh_commands_pass(tmp_path: Path, profiles_list: Path) -> None:
 def test_api_gated(tmp_path: Path, profiles_list: Path, args: str) -> None:
     """API calls that merge or change refs are gated."""
     result = run(f"gh api {args}", tmp_path, profiles_list)
-    assert result is not None and result[0] == "deny"
+    assert result is not None
+    assert result[0] == "deny"
 
 
 @pytest.mark.parametrize(
@@ -470,30 +447,32 @@ def test_api_placeholders(make_repo: Callable[..., Path], profiles_list: Path) -
     repo = make_repo(origin="git@github.com:upstream-org/tool.git")
     for endpoint in ["repos/{owner}/{repo}/merges", "repos/:owner/:repo/merges"]:
         result = run(f"gh api {endpoint} -f base=main", repo, profiles_list)
-        assert result is not None and result[0] == "deny"
+        assert result is not None
+        assert result[0] == "deny"
 
 
 def test_api_bad_repo_asks(tmp_path: Path, profiles_list: Path) -> None:
     """An endpoint whose owner/repo can't be normalised asks."""
     result = run("gh api -X PUT repos/a/.git/pulls/1/merge", tmp_path, profiles_list)
-    assert result is not None and "cannot tell which repository" in result[1]
+    assert result is not None
+    assert "cannot tell which repository" in result[1]
 
 
 def test_graphql(tmp_path: Path, profiles_list: Path) -> None:
     """GraphQL mutations that merge or change refs ask; reads pass."""
     merge = "gh api graphql -f query='mutation { mergePullRequest(input: {}) { x } }'"
     result = run(merge, tmp_path, profiles_list)
-    assert result is not None and "mergePullRequest" in result[1]
+    assert result is not None
+    assert "mergePullRequest" in result[1]
     read = "gh api graphql -F owner=x -f query='{ viewer { login } }'"
     assert run(read, tmp_path, profiles_list) is None
     (tmp_path / "q.graphql").write_text("mutation { createRef(input: {}) { x } }")
-    assert (
-        run("gh api graphql -F query=@q.graphql", tmp_path, profiles_list) is not None
-    )
+    assert run("gh api graphql -F query=@q.graphql", tmp_path, profiles_list) is not None
     (tmp_path / "r.graphql").write_text("{ viewer { login } }")
     assert run("gh api graphql -F query=@r.graphql", tmp_path, profiles_list) is None
     result = run("gh api graphql -F query=@missing.graphql", tmp_path, profiles_list)
-    assert result is not None and "cannot read the GraphQL query" in result[1]
+    assert result is not None
+    assert "cannot read the GraphQL query" in result[1]
 
 
 # Unknown repositories
@@ -503,7 +482,8 @@ def test_unknown_repo_asks_once(tmp_path: Path, profiles_list: Path) -> None:
     """An unknown repository asks once per session, then defers."""
     command = "gh pr merge -R nobody/thing"
     result = run(command, tmp_path, profiles_list)
-    assert result is not None and result[0] == "ask"
+    assert result is not None
+    assert result[0] == "ask"
     assert "nobody/thing has no profile; record one in" in result[1]
     assert run(command, tmp_path, profiles_list) is None
     assert run(command, tmp_path, profiles_list, session="s2") is not None
@@ -537,7 +517,8 @@ def test_state_file_robustness(tmp_path: Path) -> None:
     for i in range(pg.MAX_SESSIONS + 5):
         pg.first_ask(f"n{i}", "a/b")
     asked = json.loads(path.read_text())
-    assert len(asked) == pg.MAX_SESSIONS and "n0" not in asked
+    assert len(asked) == pg.MAX_SESSIONS
+    assert "n0" not in asked
     path.unlink()
     path.parent.chmod(0o500)
     try:
@@ -576,7 +557,8 @@ def test_invalid_profiles(tmp_path: Path, text: str, needle: str) -> None:
     path = tmp_path / "bad.yaml"
     path.write_text(text, encoding="utf-8")
     result = run("gh pr merge -R a/b", tmp_path, path)
-    assert result is not None and result[0] == "ask"
+    assert result is not None
+    assert result[0] == "ask"
     assert needle in result[1]
 
 
@@ -585,7 +567,8 @@ def test_missing_profiles_file(tmp_path: Path) -> None:
     path = tmp_path / "missing.yaml"
     assert run("gh pr view", tmp_path, path) is None
     result = run("gh pr merge -R a/b", tmp_path, path)
-    assert result is not None and "cannot read" in result[1]
+    assert result is not None
+    assert "cannot read" in result[1]
 
 
 def test_custom_profile(tmp_path: Path) -> None:
@@ -600,16 +583,16 @@ def test_empty_profiles_file(tmp_path: Path) -> None:
     path = tmp_path / "empty.yaml"
     path.write_text("version: 1\n")
     result = run("gh pr merge -R a/b", tmp_path, path)
-    assert result is not None and "has no profile" in result[1]
+    assert result is not None
+    assert "has no profile" in result[1]
 
 
 def test_mapping_lookup_order(tmp_path: Path, profiles_mapping: Path) -> None:
     """In ``repos``, an exact name wins over an earlier glob."""
     result = run("gh pr merge -R zzz/y", tmp_path, profiles_mapping)
-    assert result is not None and "has no profile" in result[1]
-    assert (
-        run("gh pr merge -R upstream-org/api", tmp_path, profiles_mapping) is not None
-    )
+    assert result is not None
+    assert "has no profile" in result[1]
+    assert run("gh pr merge -R upstream-org/api", tmp_path, profiles_mapping) is not None
     assert run("gh pr merge -R upstream-org/other", tmp_path, profiles_mapping) is None
 
 
@@ -619,14 +602,15 @@ def test_missing_pyyaml_asks(
     """Without PyYAML, gated actions ask with a hint."""
     real_import = builtins.__import__
 
-    def fake_import(name: str, *args: Any, **kwargs: Any) -> Any:
+    def fake_import(name: str, *args: Any, **kwargs: Any) -> Any:  # noqa: ANN401 - mirrors __import__
         if name == "yaml":
             raise ImportError(name)
         return real_import(name, *args, **kwargs)
 
     monkeypatch.setattr(builtins, "__import__", fake_import)
     result = run("gh pr merge -R a/b", tmp_path, profiles_list)
-    assert result is not None and "PyYAML is missing" in result[1]
+    assert result is not None
+    assert "PyYAML is missing" in result[1]
 
 
 # Combined verdicts and helpers
@@ -639,8 +623,10 @@ def test_strictest_verdict_wins(tmp_path: Path, profiles_list: Path) -> None:
         " && gh pr merge -R upstream-org/b"
     )
     result = run(command, tmp_path, profiles_list)
-    assert result is not None and result[0] == "deny"
-    assert "upstream-org/a" in result[1] and "upstream-org/b" in result[1]
+    assert result is not None
+    assert result[0] == "deny"
+    assert "upstream-org/a" in result[1]
+    assert "upstream-org/b" in result[1]
     assert "alice" not in result[1]
 
 
@@ -649,7 +635,7 @@ def test_git_failure_modes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> N
     ctx = pg.Context(tmp_path)
     assert pg.run_git(["--version"], pg.Context(None)) is None
 
-    def broken(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+    def broken(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:  # noqa: ANN401 - mirrors subprocess.run
         raise OSError("no git")
 
     monkeypatch.setattr(subprocess, "run", broken)
@@ -717,16 +703,16 @@ def test_gh_repo_flag_before_subcommand(tmp_path: Path, profiles_list: Path) -> 
         "gh pr -Rupstream-org/tool merge 1",
     ]:
         result = run(command, tmp_path, profiles_list)
-        assert result is not None and result[0] == "deny", command
+        assert result is not None, command
+        assert result[0] == "deny", command
     assert run("gh pr --repo upstream-org/tool view 1", tmp_path, profiles_list) is None
 
 
 def test_api_by_repository_id_asks(tmp_path: Path, profiles_list: Path) -> None:
     """repositories/<id> routes to gated endpoints ask."""
-    result = run(
-        "gh api -X PUT repositories/123/pulls/1/merge", tmp_path, profiles_list
-    )
-    assert result is not None and "cannot tell which repository" in result[1]
+    result = run("gh api -X PUT repositories/123/pulls/1/merge", tmp_path, profiles_list)
+    assert result is not None
+    assert "cannot tell which repository" in result[1]
     assert run("gh api repositories/123/issues", tmp_path, profiles_list) is None
 
 
@@ -735,14 +721,16 @@ def test_graphql_input(tmp_path: Path, profiles_list: Path) -> None:
     (tmp_path / "m.json").write_text('{"query": "mutation { mergePullRequest }"}')
     assert run("gh api graphql --input m.json", tmp_path, profiles_list) is not None
     result = run("gh api graphql -F query=@-", tmp_path, profiles_list)
-    assert result is not None and "stdin" in result[1]
+    assert result is not None
+    assert "stdin" in result[1]
 
 
 def test_ssh_host_alias(make_repo: Callable[..., Path], profiles_list: Path) -> None:
     """A remote on an SSH host alias gets the owner/repo profile."""
     repo = make_repo(origin="github-work:upstream-org/tool.git")
     result = run("git push", repo, profiles_list)
-    assert result is not None and result[0] == "deny"
+    assert result is not None
+    assert result[0] == "deny"
 
 
 def test_unknown_deny(tmp_path: Path) -> None:
@@ -750,10 +738,12 @@ def test_unknown_deny(tmp_path: Path) -> None:
     path = tmp_path / "deny.yaml"
     path.write_text("unknown: deny\n")
     result = run("gh pr merge -R a/b", tmp_path, path)
-    assert result is not None and result[0] == "deny"
+    assert result is not None
+    assert result[0] == "deny"
     path.write_text("unknown: maybe\n")
     result = run("gh pr merge -R a/b", tmp_path, path)
-    assert result is not None and "`unknown` must be" in result[1]
+    assert result is not None
+    assert "`unknown` must be" in result[1]
 
 
 @pytest.mark.parametrize(
@@ -774,4 +764,5 @@ def test_round_two_regressions(
     """Repository options without a subcommand end; quoted substitutions are seen."""
     repo = make_repo(origin="git@github.com:upstream-org/tool.git")
     result = run(command, repo, profiles_list)
-    assert result is not None and result[0] == "deny", command
+    assert result is not None, command
+    assert result[0] == "deny", command

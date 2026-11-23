@@ -167,9 +167,7 @@ GIT_BUILTINS = frozenset(
         "worktree",
     ]
 )
-PUSH_VALUE_OPTIONS = frozenset(
-    {"--repo", "--receive-pack", "--exec", "-o", "--push-option"}
-)
+PUSH_VALUE_OPTIONS = frozenset({"--repo", "--receive-pack", "--exec", "-o", "--push-option"})
 
 GH_PR_MERGE_VALUE_OPTIONS = frozenset(
     {
@@ -230,9 +228,7 @@ API_RULES: tuple[tuple[re.Pattern[str], frozenset[str], Kind], ...] = (
 )
 URL_PATTERNS = (
     # ssh://, git://, https://, with optional user and port
-    re.compile(
-        r"^[a-z][a-z0-9+.-]*://(?:[^@/]+@)?(?P<host>[^:/]+)(?::\d+)?/(?P<path>.*)$"
-    ),
+    re.compile(r"^[a-z][a-z0-9+.-]*://(?:[^@/]+@)?(?P<host>[^:/]+)(?::\d+)?/(?P<path>.*)$"),
     # scp-like: git@github.com:owner/repo.git
     re.compile(r"^(?:[^@/]+@)?(?P<host>[^:/]+):(?P<path>[^/].*)$"),
 )
@@ -372,9 +368,7 @@ def glob_match(pattern: str, name: str) -> bool:
     Returns:
         Whether the name matches.
     """
-    regex = "".join(
-        "[^/]*" if c == "*" else "[^/]" if c == "?" else re.escape(c) for c in pattern
-    )
+    regex = "".join("[^/]*" if c == "*" else "[^/]" if c == "?" else re.escape(c) for c in pattern)
     return re.fullmatch(regex, name) is not None
 
 
@@ -603,9 +597,7 @@ def remote_repos(remote: str, git_opts: Sequence[str], ctx: Context) -> tuple[st
     return tuple(dict.fromkeys(r for r in repos if r))
 
 
-def push_action(
-    args: Sequence[str], git_opts: Sequence[str], ctx: Context
-) -> list[Action]:
+def push_action(args: Sequence[str], git_opts: Sequence[str], ctx: Context) -> list[Action]:
     """Turn ``git push`` arguments into an action.
 
     Args:
@@ -929,9 +921,7 @@ def graphql_actions(fields: Sequence[str], ctx: Context) -> list[Action]:
                 raise GateError(f"cannot read the GraphQL query {text[1:]!r}") from None
         for mutation in GRAPHQL_MUTATIONS:
             if re.search(rf"\b{mutation}\b", text):
-                raise GateError(
-                    f"the GraphQL mutation {mutation} targets a repository by node ID"
-                )
+                raise GateError(f"the GraphQL mutation {mutation} targets a repository by node ID")
     return []
 
 
@@ -955,9 +945,7 @@ def actions_in(command: str, cwd: Path | None, depth: int = 0) -> list[Action]:
     try:
         tokens = tokenize(command)
     except ValueError:
-        if re.search(r"\b(git|gh)\b", command) and re.search(
-            r"\b(push|merge|api)\b", command
-        ):
+        if re.search(r"\b(git|gh)\b", command) and re.search(r"\b(push|merge|api)\b", command):
             raise GateError("cannot parse the command") from None
         return []
     actions: list[Action] = []
@@ -1046,9 +1034,7 @@ def load_profiles(path: Path) -> Profiles:
     try:
         import yaml
     except ImportError:
-        raise GateError(
-            "PyYAML is missing; install it (`pip install pyyaml`) or uv"
-        ) from None
+        raise GateError("PyYAML is missing; install it (`pip install pyyaml`) or uv") from None
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
@@ -1072,14 +1058,10 @@ def load_profiles(path: Path) -> Profiles:
     if not isinstance(listed, list) or not isinstance(mapped, dict):
         raise GateError(f"{path}: `repositories` must be a list and `repos` a mapping")
     entries_listed = tuple(
-        repo_entry(
-            item.get("match") if isinstance(item, dict) else None, item, allowed, path
-        )
+        repo_entry(item.get("match") if isinstance(item, dict) else None, item, allowed, path)
         for item in listed
     )
-    entries_mapped = tuple(
-        repo_entry(key, value, allowed, path) for key, value in mapped.items()
-    )
+    entries_mapped = tuple(repo_entry(key, value, allowed, path) for key, value in mapped.items())
     unknown = data.get("unknown", "ask")
     if unknown not in ("ask", "deny"):
         raise GateError(f"{path}: `unknown` must be ask or deny")
@@ -1130,9 +1112,7 @@ def repo_entry(
     profile = data.get("profile")
     if profile not in allowed:
         raise GateError(f"{path}: {pattern}: unknown profile {profile!r}")
-    return RepoEntry(
-        pattern.lower(), str(profile), data, allowed_actions(data, pattern, path)
-    )
+    return RepoEntry(pattern.lower(), str(profile), data, allowed_actions(data, pattern, path))
 
 
 def names(value: object, fallback: str) -> str:
@@ -1150,9 +1130,7 @@ def names(value: object, fallback: str) -> str:
     return str(value) if value else fallback
 
 
-def decide(
-    action: Action, repo: str, entry: RepoEntry, profiles: Profiles
-) -> Decision | None:
+def decide(action: Action, repo: str, entry: RepoEntry, profiles: Profiles) -> Decision | None:
     """Apply a repository's profile to an action.
 
     Args:
@@ -1176,9 +1154,7 @@ def decide(
                 f"{where}: contributors push to their fork only; push the branch to "
                 "your fork and open a PR from there",
             )
-        return Decision(
-            "deny", f"{where}: contributors don't merge; the maintainers do"
-        )
+        return Decision("deny", f"{where}: contributors don't merge; the maintainers do")
     if action.kind == "push":
         return None
     if entry.profile == "owner-blessed-maintainer":
@@ -1256,9 +1232,7 @@ def first_ask(session: str, repo: str) -> bool:
     return True
 
 
-def evaluate(
-    command: str, cwd: Path | None, session: str, config: Path
-) -> Decision | None:
+def evaluate(command: str, cwd: Path | None, session: str, config: Path) -> Decision | None:
     """Decide on a Bash command.
 
     Args:
@@ -1282,9 +1256,7 @@ def evaluate(
     for action in actions:
         if not action.repos:
             decisions.append(
-                Decision(
-                    "ask", f"{PREFIX}cannot tell which repository {action.what} targets"
-                )
+                Decision("ask", f"{PREFIX}cannot tell which repository {action.what} targets")
             )
         for repo in action.repos:
             entry = profiles.lookup(repo)
@@ -1339,7 +1311,7 @@ def main(stdin: str, environ: Mapping[str, str]) -> str:
         cwd = Path(payload.get("cwd") or os.getcwd())
         session = str(payload.get("session_id") or "")
         decision = evaluate(command, cwd, session, Path(config).expanduser())
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - any failure must end in "ask", never in a crash
         decision = Decision("ask", f"{PREFIX}internal error: {exc!r}")
     if decision is None:
         return ""

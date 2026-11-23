@@ -48,11 +48,9 @@ npx --yes @anthropic-ai/claude-code@<CLAUDE_CODE_VERSION> plugin validate --stri
 # Docs
 python3 -m venv .venv && .venv/bin/pip install '.[docs]' && .venv/bin/mkdocs build --strict
 # Python hooks: lint, format, types, tests with 100% coverage
-.venv/bin/pip install '.[dev]'
+.venv/bin/pip install '.[test]'
 .venv/bin/ruff check . && .venv/bin/ruff format --check . && .venv/bin/mypy && .venv/bin/pytest
 ```
-
-The Python checks don't run in CI yet; run them locally.
 
 PowerShell scripts are checked with PSScriptAnalyzer in CI, and the machine-file collectors run on
 Linux, macOS and Windows runners (job `smoke`).
