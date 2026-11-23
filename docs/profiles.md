@@ -66,8 +66,14 @@ co_owners         owner-shared                 the other owners' GitHub logins
 owner             maintainer, developer        the owner's GitHub login
 responsibilities  maintainer                   what you may decide yourself
 extra_rights      developer (optional)         rights beyond issues, PRs and feature branches
+allowed_actions   any (optional)               actions the profile gate lets through (push,
+                                               merge); also per profile under `profiles`
 ```
 
-The template in `templates/overlay/profiles.yaml` has the full definitions and examples. A hook that
-applies the profile to `gh` and `git` actions is planned; until then, agents look the profile up
-before every GitHub action.
+Instead of the `repositories` list, entries may also go into a `repos` mapping keyed by name or
+glob (`repos: {example-org/example-site: {profile: ...}}`); there an exact name wins over a glob.
+`repositories` is checked first.
+
+The template in `templates/overlay/profiles.yaml` has the full definitions and examples. The
+[profile gate](profile-gate.md) hook applies the profiles to `gh` and `git` actions (pushes and
+merges); agents still look the profile up before every other GitHub action.

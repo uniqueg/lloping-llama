@@ -68,7 +68,9 @@ nav:
   - Concepts: concepts.md
   - Overlay guide: overlay.md
   - Profiles: profiles.md
+  - Profile gate: profile-gate.md
   - Reviewers: reviewers.md
+  - Messages: messages.md
   - Agent sweeper: sweeper.md
   - Reference: reference.md
   - Contributing: contributing.md
