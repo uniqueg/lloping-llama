@@ -42,6 +42,7 @@ agents/           adversarial-reviewer, quality-reviewer, contract-reviewer
 skills/           align-repo
 hooks/            event hooks (none yet)
 workflows/        Workflow tool scripts (none yet)
+output-styles/    Terse: short replies, context only for decisions, minimal to-dos
 bin/              claude-statusline (on the Bash tool's PATH while the plugin is enabled)
 templates/        overlay/: the structure of your private overlay, with fill-in instructions
 docs/             the documentation (MkDocs Material)
