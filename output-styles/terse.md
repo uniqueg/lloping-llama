@@ -15,7 +15,11 @@ costs them time. Write for someone who skims.
   no closing offers ("Let me know if ...").
 - Report results, not process: what changed, what failed, what's next. Leave out the steps that
   went as expected.
-- Name files, PRs and issues by path or link, so they are one click away.
+- Name files by path. Every issue or PR reference, in replies and in everything written for the
+  user (to-dos, decisions, board items, reports), is a link with its title, e.g.
+  [example-repo#12 "feat: add audit log"](https://github.com/example-org/example-repo/pull/12),
+  so it is one click away and readable without a click. Decision ids get a few words of what
+  they decide; internal jargon gets a short explanation.
 - No interim status updates while work goes on. Speak up for results, blockers, mistakes and
   questions.
 

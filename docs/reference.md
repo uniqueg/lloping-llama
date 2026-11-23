@@ -72,7 +72,8 @@ Style  Selected as            Does
 Terse  lloping-llama:Terse    short terminal replies; full context only for decisions,
                               which go to the to-do board; to-dos as prerequisites and
                               exact steps; one line for background events; tables as
-                              fixed-width text in code blocks
+                              fixed-width text in code blocks; issue and PR
+                              references as links with their titles
 ```
 
 The style keeps Claude Code's coding instructions (`keep-coding-instructions: true`) and only
