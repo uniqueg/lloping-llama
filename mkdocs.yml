@@ -67,6 +67,7 @@ nav:
   - Getting started: getting-started.md
   - Concepts: concepts.md
   - Overlay guide: overlay.md
+  - Rules and levels: rules.md
   - Profiles: profiles.md
   - Profile gate: profile-gate.md
   - Reviewers: reviewers.md
