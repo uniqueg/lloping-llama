@@ -8,6 +8,8 @@ Overlay root: `~/path/to/agent-overlay` (skills of the lloping-llama plugin call
 
 ## Always loaded
 
+@~/path/to/lloping-llama/rules/global.md
+@me/rules.md
 @me/preferences.md
 @me/machine.md
 

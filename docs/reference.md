@@ -107,6 +107,19 @@ See [Profile gate](profile-gate.md).
 
 None yet. See `workflows/README.md`.
 
+## Rules
+
+```text
+Path                                    What
+--------------------------------------  ---------------------------------------------------
+rules/global.md                         generic global rules, imported from your user memory
+rules/levels/<name>/settings.json       a level's permission mode and allow/ask/deny rules
+rules/levels/<name>/rules.md            a level's rules, appended to the system prompt
+```
+
+Levels: `auto`, `reviewed`, `supervised`, `external`. Not loaded by the plugin; see
+[Rules and levels](rules.md).
+
 ## Templates
 
 ```text
@@ -114,6 +127,7 @@ Path                                         What
 -------------------------------------------  ----------------------------------------------
 templates/overlay/                           the overlay structure (see the Overlay guide)
 templates/overlay/profiles.yaml              the six profiles and example repositories
+templates/overlay/me/rules.md                your additions to the kit's global rules
 templates/overlay/me/people.md               people schema with send: draft | auto and the
                                              auto-send note
 templates/overlay/me/collect-machine/        linux.sh (bash), macos.sh (sh/zsh/bash),
