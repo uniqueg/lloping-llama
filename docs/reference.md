@@ -17,8 +17,9 @@ contract-reviewer     inherit  Read, Grep, Glob, Bash   API and spec style, brea
 All three take a repository path and a base ref (e.g. `origin/main`); the contract reviewer also
 takes a PR number or a draft PR body. They review only `git diff <base>...HEAD`, verify each finding
 before reporting it, report at most 10 findings, and never edit, commit, push or post. Their prompts
-make them read-only; their `Bash` tool is needed for `git diff` and for running checks. Run them in
-parallel before every push of code changes.
+make them read-only; their `Bash` tool is needed for `git diff` and for running checks. Run them
+before every push of code changes: the adversarial reviewer in parallel with the quality reviewer
+followed by the contract reviewer. See [Reviewers](reviewers.md).
 
 ## Skills
 

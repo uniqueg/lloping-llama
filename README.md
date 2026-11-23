@@ -51,8 +51,9 @@ docs/             the documentation (MkDocs Material)
 ## Use
 
 - **Before every push**, ask Claude to run the reviewers on your branch, e.g. "review this branch
-  against origin/main with the adversarial, quality and contract reviewers". They read the diff,
-  verify each finding and report; they never edit, commit or push.
+  against origin/main: the adversarial reviewer, and in parallel the quality reviewer followed by
+  the contract reviewer". They read the diff, verify each finding and report; they never edit,
+  commit or push.
 - **Align a repository** with your org's policy: `/lloping-llama:align-repo example-org/example-repo`
   (the policy lives in your overlay, see below).
 - **Set up your overlay**: copy `templates/overlay/` into a new private repository, fill it in and

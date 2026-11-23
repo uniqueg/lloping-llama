@@ -65,11 +65,12 @@ style. Changes apply to new sessions.
 Before you push, ask Claude:
 
 ```text
-Review this branch against origin/main with the adversarial-reviewer, quality-reviewer and
-contract-reviewer agents in parallel, then fix confirmed high and medium findings.
+Review this branch against origin/main: run the adversarial-reviewer, and in parallel the
+quality-reviewer followed by the contract-reviewer. Then fix confirmed high and medium findings.
 ```
 
-The reviewers only read: they never edit, commit or push.
+The reviewers only read: they never edit, commit or push. See [Reviewers](reviewers.md) for what
+each one checks and why they run in this order.
 
 ## Set up your overlay
 
