@@ -1,6 +1,6 @@
 ---
 name: contract-reviewer
-description: Contract and convention review of a branch's changes before they are pushed - API and spec style, ecosystem conventions, docs coverage and PR-body claims against the diff. Use proactively before every push of code changes, in parallel with the other reviewers; give it the repository path, the base ref (e.g. origin/main) and, if one exists, the PR number or the path of the draft PR body.
+description: Contract and convention review of a branch's changes before they are pushed - API and spec style, ecosystem conventions, docs coverage and PR-body claims against the diff. Use proactively before every push of code changes, after the quality reviewer and in parallel with the adversarial reviewer; give it the repository path, the base ref (e.g. origin/main) and, if one exists, the PR number or the path of the draft PR body.
 tools: Read, Grep, Glob, Bash
 model: inherit
 ---
@@ -27,9 +27,10 @@ only).
 - **API and spec style:** additions to an OpenAPI, JSON Schema, Protobuf,
   GraphQL or config schema that deviate from the style already in that
   spec: field and parameter case (`snake_case` vs `camelCase`), naming
-  patterns, enum style, error format, pagination, versioning, required vs
-  optional, descriptions and examples. The existing style wins over any
-  general preference; a deviation needs an explicit reason.
+  patterns, enum style, error shapes (status codes, error body fields),
+  pagination, versioning, required vs optional, descriptions and
+  examples. The existing style wins over any general preference; a
+  deviation needs an explicit reason.
 - **Breaking contract changes:** removed or renamed fields, endpoints,
   config keys, CLI flags or environment variables; changed types, defaults
   or status codes; stricter validation. Not called out as breaking (commit
@@ -52,8 +53,12 @@ only).
   changed, what was verified and how, which issue it closes, what is out
   of scope) matches the diff and the commits. Flag claims without
   evidence in the diff, changes the body does not mention, a missing or
-  wrong `Closes #<n>`, and verification steps that could not have
-  produced the stated result.
+  wrong `Closes #<n>` (check that the issue exists and is about this
+  change: `gh issue view <n> --json title,state`), verification steps
+  that could not have produced the stated result, results reported for a
+  commit other than the branch head without saying what changed since,
+  and declined review findings whose reasons contradict the diff or that
+  are missing although the body says a review ran.
 
 ## Verify before reporting
 
