@@ -9,6 +9,8 @@ and project work. It ships:
 - **Skills** for recurring jobs: `align-repo` audits a repository against its organization's
   policy and writes one instruction set; `message-drafts` turns messages for people into unsent
   Slack drafts (see [Messages](messages.md)).
+- **An output style**, `Terse`: short terminal replies, full context only for decisions, minimal
+  to-dos, fixed-width tables.
 - **A hook** that blocks Slack messages to channels, groups and anyone you haven't allowed.
 - **A status line** that shows the model, the directory, activity and your usage limits.
 - **An overlay template**: the structure of a private repository for everything that is yours

@@ -39,16 +39,38 @@ Claude Code configuration lives elsewhere (`CLAUDE_CONFIG_DIR`), adjust the path
 saves the status JSON to `/tmp/claude-<uid>/statusline/` (or `$CLAUDE_STATUS_DIR`), so that Claude
 can read its own usage and pace its agents.
 
+## Select the output style
+
+The plugin ships the `Terse` output style (see [Reference](reference.md#output-styles)). Plugin
+styles are named `<plugin>:<style>`; `/output-style` without an argument lists them. Select it
+with:
+
+```text
+/output-style lloping-llama:Terse
+```
+
+`/output-style` and `/config` (Output style) save the choice for the current project in
+`.claude/settings.local.json`. To make it your default everywhere, set it in
+`~/.claude/settings.json`:
+
+```json
+"outputStyle": "lloping-llama:Terse"
+```
+
+The value must match the name in the list exactly; an unknown name falls back to the default
+style. Changes apply to new sessions.
+
 ## Review a branch
 
 Before you push, ask Claude:
 
 ```text
-Review this branch against origin/main with the adversarial-reviewer, quality-reviewer and
-contract-reviewer agents in parallel, then fix confirmed high and medium findings.
+Review this branch against origin/main: run the adversarial-reviewer, and in parallel the
+quality-reviewer followed by the contract-reviewer. Then fix confirmed high and medium findings.
 ```
 
-The reviewers only read: they never edit, commit or push.
+The reviewers only read: they never edit, commit or push. See [Reviewers](reviewers.md) for what
+each one checks and why they run in this order.
 
 ## Set up your overlay
 
