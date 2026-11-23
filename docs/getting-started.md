@@ -76,3 +76,16 @@ each one checks and why they run in this order.
 
 Copy `templates/overlay/` from this repository into a new private repository and follow the
 [Overlay guide](overlay.md). Skills such as `align-repo` read your policies from there.
+
+Then tell the plugin's hooks where the overlay is, in `~/.claude/settings.json`:
+
+```json
+{
+  "env": {
+    "LLOPING_LLAMA_OVERLAY": "/home/you/path/to/agent-overlay"
+  }
+}
+```
+
+Without it, the Slack send guard blocks every Slack send (drafts still work); see
+[Messages](messages.md).
