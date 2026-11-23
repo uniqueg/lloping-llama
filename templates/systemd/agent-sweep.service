@@ -1,0 +1,25 @@
+# systemd user service of the agent workspace sweeper. Replace the
+# placeholders before installing (see the docs, "Agent sweeper"):
+#   @PLUGIN_DIR@   absolute path of the lloping-llama checkout
+#   @CLONE_ROOT@   absolute path of the agent clone root
+# %h is systemd's specifier for your home directory.
+[Unit]
+Description=Sweep agent workspaces (build outputs, finished clones, resources)
+Documentation=https://lloping-llama.readthedocs.io/en/latest/sweeper/
+ConditionPathIsDirectory=@CLONE_ROOT@
+
+[Service]
+Type=oneshot
+ExecStart=@PLUGIN_DIR@/bin/agent-sweep
+Environment=AGENT_CLONES=@CLONE_ROOT@
+# git, gh, docker, kind/k3d and kubectl must be on this PATH; add the
+# directories of tools installed through version managers (mise, asdf, ...)
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+# Optional: a command called with one line when the disk is over 92 %
+#Environment="AGENT_SWEEP_NOTIFY=notify-send -u critical"
+# Optional: the gh login to use, if not the default one
+#Environment=GH_CONFIG_DIR=%h/.config/gh
+Nice=15
+IOSchedulingClass=idle
+CPUSchedulingPolicy=batch
+TimeoutStartSec=50min

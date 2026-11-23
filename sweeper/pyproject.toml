@@ -1,0 +1,53 @@
+# The agent-sweep and agent-ledger commands (bin/agent-sweep, bin/agent-ledger).
+# Standard library only: the plugin runs them from bin/ without installing
+# anything. This file holds the package metadata and the dev tools
+# (`pip install -e '.[test]'`, CI job `sweeper`).
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent-sweeper"
+version = "0.1.0"
+description = "Autonomous cleanup of agent workspaces (ledger + sweep)"
+license = "Apache-2.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[project.optional-dependencies]
+test = [
+  "pytest>=8,<10",
+  "pytest-cov>=5,<8",
+  "mypy>=1.10,<2",
+  "ruff>=0.6,<1",
+]
+
+[project.scripts]
+agent-sweep = "agent_sweeper.sweep:main"
+agent-ledger = "agent_sweeper.ledger:main"
+
+[tool.setuptools]
+packages = ["agent_sweeper"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "--cov=agent_sweeper --cov-report=term-missing --cov-fail-under=100"
+
+[tool.coverage.run]
+branch = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "D", "S", "BLE", "SIM", "RUF"]
+ignore = ["S101", "S603", "S607", "S108", "SIM105"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.mypy]
+strict = true
+files = ["agent_sweeper", "tests"]

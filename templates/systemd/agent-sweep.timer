@@ -1,0 +1,11 @@
+[Unit]
+Description=Run the agent workspace sweeper hourly and 5 minutes after boot
+
+[Timer]
+OnBootSec=5min
+OnCalendar=hourly
+RandomizedDelaySec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

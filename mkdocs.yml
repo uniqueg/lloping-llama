@@ -71,5 +71,6 @@ nav:
   - Profile gate: profile-gate.md
   - Reviewers: reviewers.md
   - Messages: messages.md
+  - Agent sweeper: sweeper.md
   - Reference: reference.md
   - Contributing: contributing.md

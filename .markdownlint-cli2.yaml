@@ -18,5 +18,6 @@ globs:
 ignores:
   - "site/**"
   - ".venv/**"
+  - "sweeper/.venv/**"
   - ".cache/**"
   - "node_modules/**"
