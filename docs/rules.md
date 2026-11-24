@@ -12,8 +12,9 @@ Python and GitHub Actions, delegation to subagents, issues and PRs, release note
 coding workflow and learnings. One rule per line, so a diff shows exactly which rule changed.
 
 The parts that name people, organizations, hosts or local paths don't belong in the kit. Keep them
-in your overlay, in the same sections (e.g. `me/rules.md`), and import both from your user memory
-file, kit first:
+in your overlay, in the same sections (e.g. `me/rules.md`). Import both from your user memory
+file, kit first, or import only your overlay's `CLAUDE.md`, which already imports both (the
+overlay template does); not both ways, or the rules load twice:
 
 ```text
 @~/path/to/lloping-llama/rules/global.md
@@ -22,6 +23,11 @@ file, kit first:
 
 Use absolute (`~/…`) paths: if your user memory file is a symlink, relative imports may resolve
 from the link's folder. The more specific layer wins (see [Overlay guide](overlay.md)).
+
+The kit's file refers to things your overlay defines: the autonomy level a session runs at and its
+default, step 1 of the coding workflow (where you and agents work: worktrees, clone folder), the
+work folder for checks and drafts, `machine.md`, and your organization's labels (e.g. the `status:`
+labels). Put them in your `me/rules.md` (or org files) under the same headings.
 
 Check that a new session loads them with `/memory`, which lists the imported files.
 
@@ -53,9 +59,21 @@ claude --settings ~/path/to/lloping-llama/rules/levels/$level/settings.json \
 ```
 
 A shell function that wraps `claude` and takes a `--level` flag (default `supervised`) saves the
-typing. Keep the permissions that are the same at every level in your user settings; Claude Code
-combines the lists of all settings sources.
+typing. Claude Code combines the permission lists of all settings sources and checks `deny`, then
+`ask`, then `allow`.
+
+!!! warning "The levels need a base deny list"
+
+    The level files hold only what differs between levels. `auto` and `reviewed` allow
+    `Bash(gh api *)`, and `auto/rules.md` tells Claude that REST `DELETE` calls are denied. That is
+    only true with a base in your user settings that the kit doesn't ship yet. Before you use a
+    level, deny there at least: `gh release create/delete/delete-asset/upload`, `gh auth`,
+    `gh secret`, `gh repo edit/delete`, risky `gh api` calls (patterns with `merge`, `DELETE`,
+    `delete`, `protection`, `rulesets`, `collaborators`, `secrets`, `hooks`, `environments`,
+    `--input`, and `=@` file paths outside temp folders), force-pushes (`--force`, `-f`, `+refspec`,
+    `--mirror`) and reading your secret files; and put edits to your agent config (rules, agents,
+    hooks, skills, settings) under `ask`.
 
 The `reviewed` and `supervised` rules name a human-review gate (a `level-gate.sh` hook and a
 `claude-approve` command that records your approval of one PR). The kit doesn't ship them yet; until
-it does, the rules still apply, but nothing enforces the gate.
+it does, nothing enforces the gate, so `reviewed` merges like `auto` once its other conditions hold.
