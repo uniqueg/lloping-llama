@@ -32,7 +32,7 @@ them in your `me/rules.md` (or org files) under the same headings.
 
 Check that a new session loads them with `/memory`, which lists the imported files.
 
-## Rights: profiles, not session levels
+## Rights: profiles
 
 What an agent may do depends on the repository, not on the session: each repository gets a
 profile in your overlay's `profiles.yaml` (see [Profiles](profiles.md)), and the
@@ -40,8 +40,8 @@ profile in your overlay's `profiles.yaml` (see [Profiles](profiles.md)), and the
 in your name, merges and Dependabot updates to the same profiles, and give a repository that isn't
 listed `contributor` rights until you record it.
 
-Sessions therefore start without a level flag. Pick the permission mode in your user settings
-(e.g. `"defaultMode": "auto"`); the gate can only add `ask` and `deny` on top of it.
+Rights don't change between sessions. Pick the permission mode in your user settings (e.g.
+`"defaultMode": "auto"`); the gate can only add `ask` and `deny` on top of it.
 
 !!! warning "The rules need a base deny list"
 
