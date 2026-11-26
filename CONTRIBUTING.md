@@ -23,6 +23,7 @@ hooks/hooks.json          event hooks; scripts next to it, via ${CLAUDE_PLUGIN_R
 workflows/<name>.js       Workflow tool scripts
 bin/<name>                executables, on the Bash tool's PATH while the plugin is enabled
 sweeper/                  Python package behind bin/agent-sweep and bin/agent-ledger, with tests
+rules/                    global rules users import (not loaded by the plugin)
 templates/                files users copy (not loaded by the plugin)
 tests/                    smoke tests, the shell lint script and the hook tests (not loaded)
 ```

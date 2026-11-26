@@ -9,7 +9,7 @@
 
 ## Reporting
 
-<!-- e.g. "Report only at a dead end or when I ask; one push notification then." -->
+<!-- e.g. "When you stop and wait for me, send one push notification." -->
 
 ## Reviews and merging
 
