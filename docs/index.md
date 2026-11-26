@@ -12,8 +12,7 @@ and project work. It ships:
 - **An output style**, `Terse`: short terminal replies, full context only for decisions, minimal
   to-dos, fixed-width tables.
 - **A hook** that blocks Slack messages to channels, groups and anyone you haven't allowed.
-- **Global rules and autonomy levels** to import into your user memory and start sessions with
-  (see [Rules and levels](rules.md)).
+- **Global rules** to import into your user memory (see [Rules](rules.md)).
 - **A status line** that shows the model, the directory, activity and your usage limits.
 - **An overlay template**: the structure of a private repository for everything that is yours
   (preferences, machine, people, organizations, projects, to-dos), so the kit itself stays

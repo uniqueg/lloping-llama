@@ -113,12 +113,9 @@ None yet. See `workflows/README.md`.
 Path                                    What
 --------------------------------------  ---------------------------------------------------
 rules/global.md                         generic global rules, imported from your user memory
-rules/levels/<name>/settings.json       a level's permission mode and allow/ask/deny rules
-rules/levels/<name>/rules.md            a level's rules, appended to the system prompt
 ```
 
-Levels: `auto`, `reviewed`, `supervised`, `external`. Not loaded by the plugin; see
-[Rules and levels](rules.md).
+Not loaded by the plugin; see [Rules](rules.md).
 
 ## Templates
 

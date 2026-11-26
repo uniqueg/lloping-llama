@@ -47,8 +47,7 @@ output-styles/    Terse: short replies, context only for decisions, minimal to-d
 bin/              claude-statusline, agent-sweep, agent-ledger (on the Bash tool's PATH while the
                   plugin is enabled)
 sweeper/          Python package of agent-sweep and agent-ledger, with its tests
-rules/            global.md: generic global rules to import; levels/<name>/: autonomy levels
-                  (settings.json and rules.md)
+rules/            global.md: generic global rules to import
 templates/        overlay/: the structure of your private overlay, with fill-in instructions;
                   systemd/: the sweeper's user units
 docs/             the documentation (MkDocs Material)
@@ -65,8 +64,8 @@ docs/             the documentation (MkDocs Material)
 - **Clean up after agents**: `agent-ledger` records each agent's clone and resources, and
   `agent-sweep` (hourly, systemd user timer) removes what is finished, after rescuing any unpushed
   work. See the [Agent sweeper](https://lloping-llama.readthedocs.io/en/latest/sweeper/) page.
-- **Import the global rules** (`rules/global.md`) from your user memory and start sessions at an
-  autonomy level (`rules/levels/`); see [Rules and levels](https://lloping-llama.readthedocs.io/en/latest/rules/).
+- **Import the global rules** (`rules/global.md`) from your user memory; see
+  [Rules](https://lloping-llama.readthedocs.io/en/latest/rules/).
 - **Set up your overlay**: copy `templates/overlay/` into a new private repository, fill it in and
   import its `CLAUDE.md` from `~/.claude/CLAUDE.md`. See the
   [Overlay guide](https://lloping-llama.readthedocs.io/en/latest/overlay/).
