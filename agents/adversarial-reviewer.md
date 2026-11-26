@@ -53,6 +53,12 @@ how callers use it, and where cheap, run a focused test or a short script
 directory for scratch files). Drop findings you cannot support with a
 concrete scenario. Prefer no findings over speculative ones.
 
+Never start the application under review outside a test cluster or
+container, and run every command with `KUBECONFIG` unset or pointing to an
+empty file: an app can load a kubeconfig or other credentials on its own and
+act on a real cluster. Stub external tools as executables first in `PATH`,
+not as shell functions.
+
 ## Output
 
 Report at most 10 findings, most severe first, each as:
