@@ -49,6 +49,12 @@ really exists, that a test really does not cover the path). You may run
 tests read-only; never edit, commit or push. Drop findings you cannot
 point to precisely.
 
+Never start the application under review outside a test cluster or
+container, and run every command with `KUBECONFIG` unset or pointing to an
+empty file: an app can load a kubeconfig or other credentials on its own and
+act on a real cluster. Stub external tools as executables first in `PATH`,
+not as shell functions.
+
 ## Output
 
 Report at most 10 findings, most important first, each as:
