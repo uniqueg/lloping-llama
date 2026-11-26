@@ -39,6 +39,7 @@ These apply to every project and persona. Project `CLAUDE.md`/`AGENTS.md` files 
 - In decision records, mark details that come from your own proposal (not from my requirement) with "(Claude's proposal)". A deviation from such a detail is your decision when my goal still holds: record it as an amendment and name it in the next summary; don't ask me.
 - A bare "continue" or "go on" is no answer to open questions: resume only decided work and ask the questions again.
 - Before acting on an issue or PR I mention, read its current state, comments included; if it's already done, record the decision and post nothing.
+- Write every artefact with a fair chance of reuse (runbooks, smoke tests, maintenance and operation scripts, brief and report templates, pin files) generically from the start: parameters for hosts, versions, pins, dates and names instead of values from one run, current values kept in one place they read. One-off material stays local and out of version control.
 - Estimate agent work in hours, not days; what takes time is waiting for me, CI and other people.
 - Whenever I have to run something, give all of it in one block, in my shell's syntax (see `machine.md`), that runs from any directory: variables, setup (e.g. a clone if missing), every step with the output to expect, what to do if a step deviates, and cleanup. Never refer to commands from earlier messages.
 - Command blocks contain no pagers or interactive viewers (`less`, `more`, `man`), and their steps are safe to re-run.
